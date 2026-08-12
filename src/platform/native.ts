@@ -41,12 +41,18 @@ export async function saveProject(document: ProjectDocument, currentPath: string
   await invoke('write_text_file',{path,contents}); return path;
 }
 
-export async function savePng(dataUrl:string, suggestedName:string):Promise<boolean>{
-  if(!isTauri()){const link=document.createElement('a');link.href=dataUrl;link.download=suggestedName;link.click();return true;}
+export async function saveExportFile(contents:string,suggestedName:string,extension:'png'|'pdf'|'csv'):Promise<boolean>{
+  const labels={png:'PNG 图片',pdf:'PDF 文档',csv:'CSV 数据'};
+  if(!isTauri()){
+    const link=document.createElement('a');link.download=suggestedName;
+    link.href=contents.startsWith('data:')?contents:URL.createObjectURL(new Blob([contents],{type:'text/csv;charset=utf-8'}));link.click();return true;
+  }
   const [{save},{invoke}]=await Promise.all([import('@tauri-apps/plugin-dialog'),import('@tauri-apps/api/core')]);
-  const path=await save({defaultPath:suggestedName,filters:[{name:'PNG 图片',extensions:['png']}]}); if(!path)return false;
-  await invoke('write_base64_file',{path,contents:dataUrl});return true;
+  const path=await save({defaultPath:suggestedName,filters:[{name:labels[extension],extensions:[extension]}]});if(!path)return false;
+  if(extension==='csv')await invoke('write_text_file',{path,contents});else await invoke('write_base64_file',{path,contents});return true;
 }
+
+export async function savePng(dataUrl:string,suggestedName:string):Promise<boolean>{return saveExportFile(dataUrl,suggestedName,'png');}
 
 export async function copyText(text:string):Promise<void>{
   if(isTauri()){const {writeText}=await import('@tauri-apps/plugin-clipboard-manager');await writeText(text);return;}
