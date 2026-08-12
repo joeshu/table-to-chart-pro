@@ -39,12 +39,20 @@ jobs:
           test -n "$PBX"
           perl -0pi -e 's/buildSettings = \{/buildSettings = {\n\t\t\t\tCODE_SIGNING_ALLOWED = NO;\n\t\t\t\tCODE_SIGNING_REQUIRED = NO;\n\t\t\t\tCODE_SIGN_IDENTITY = "";/g' "$PBX"
           grep -q 'CODE_SIGNING_ALLOWED = NO' "$PBX"
-      - name: Build unsigned iOS app
-        run: cargo tauri ios build --ci --target aarch64
+      - name: Build unsigned iOS app without archive export
+        shell: bash
+        run: |
+          PROJECT=$(find src-tauri/gen/apple -name '*.xcodeproj' -type d | head -1)
+          test -n "$PROJECT"
+          SCHEME=$(xcodebuild -project "$PROJECT" -list -json | python3 -c 'import json,sys; print(json.load(sys.stdin)["project"]["schemes"][0])')
+          xcodebuild -project "$PROJECT" -scheme "$SCHEME" -sdk iphoneos \
+            -configuration Release -destination 'generic/platform=iOS' \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY='' \
+            CONFIGURATION_BUILD_DIR="$PWD/ios-build" build
       - name: Package unsigned IPA
         shell: bash
         run: |
-          APP=$(find src-tauri/gen/apple -name '*.app' -type d ! -path '*simulator*' | head -1)
+          APP=$(find ios-build -name '*.app' -type d | head -1)
           test -n "$APP" || { echo 'No iOS .app bundle found'; exit 1; }
           rm -rf Payload
           mkdir Payload
