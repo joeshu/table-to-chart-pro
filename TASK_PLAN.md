@@ -15,16 +15,16 @@
 
 ## 当前完成度
 
-- 已完成：`142` 项。
-- 未完成或待验证：`116` 项。
+- 已完成：`153` 项。
+- 未完成或待验证：`105` 项。
 - 已稳定：Windows 构建、数据安全、Vue 工作台、原生项目文件、表格导入、高质量导出。
-- 当前阻塞：iOS 未签名 IPA 尚未取得最终绿色 Artifact。
+- iOS 未签名 IPA 已构建并通过 ZIP 完整性验证；真机侧载、Files 打开和分享仍待验证。
 - 尚未专项实施：第 9 批 iPhone/iPad 触控布局。
 - 第 10 批：专业图表、模板、About、隐私许可和 Release 工作流已提交；签名、自动更新和首次 Release 实发仍待完成。
 
 ## 最高优先级缺项
 
-1. iOS 未签名 IPA 构建、下载和真机侧载验证。
+1. iOS 真机侧载、Files 打开、系统分享和安装后流程验证。
 2. iPhone 底部标签、iPad 双栏、安全区、分享面板和键盘适配。
 3. ESLint/Prettier、Playwright、覆盖率 80% 和 CSP 收紧。
 4. 大表格虚拟化、指定位置插入行列、完整错误面板。
@@ -75,8 +75,8 @@
 
 - [x] ✅ Windows Action 连续两次绿色。
 - [x] ✅ Windows Artifact 内含 `.msi` 或 `.exe` 安装包。
-- [ ] iOS Action 能生成可验证的未签名 `.ipa`，或明确记录 Tauri/iOS runner 的阻塞原因与替代方案。
-- [ ] Actions 不再因清单、路径、重复配置等基础错误失败。
+- [x] ✅ iOS Action 生成并验证未签名 `.ipa` Artifact（3.2 MB）。
+- [x] ✅ Actions 不再因清单、路径、重复配置等基础错误失败。
 
 ## 建议提交
 
@@ -218,11 +218,11 @@ feat(editor): improve table editing validation and history
 - [x] ✅ 建立集中状态管理；避免散落全局变量。
 - [x] ✅ 移除内联 `onclick`。
 - [x] ✅ 移除动态 `innerHTML` 业务渲染。
-- [ ] 收紧 CSP，逐步去掉 `unsafe-inline`。
-- [ ] 配置 ESLint、Prettier、TypeScript strict。
+- [x] ✅ 收紧 CSP，移除脚本 `unsafe-inline` 和外部 CDN。
+- [x] ✅ 配置 ESLint、Prettier、TypeScript strict。
 - [x] ✅ 配置 Vitest。
 - [x] ✅ 为解析、校验、统计编写单元测试。
-- [ ] 为主链路添加 Playwright 冒烟测试。
+- [x] ✅ 为主链路添加 Playwright 冒烟测试。
 - [x] ✅ CI 增加 `npm run typecheck`、`npm test`、`cargo check`。
 
 ## 建议目录
@@ -420,14 +420,14 @@ feat(tauri): add native file clipboard and persistence services
 
 ### 项目
 
-- [x] ✅ 定义 `.t2c` 项目格式；JSON Schema 文件仍待补充。
+- [x] ✅ 定义 `.t2c` 项目格式与 JSON Schema。
 - [x] ✅ 包含数据、图表、主题和元数据。
 - [x] ✅ 增加 `schemaVersion`。
 - [x] ✅ 实现新建、打开、保存、另存为。
 - [x] ✅ 实现自动保存。
 - [x] ✅ 实现崩溃恢复。
 - [x] ✅ 最近项目列表。
-- [ ] 项目迁移函数，兼容旧版本。
+- [x] ✅ 项目迁移函数，兼容无 `schemaVersion` 的旧项目。
 - [x] ✅ 打开损坏项目时展示可诊断错误。
 
 ## 验收
@@ -454,14 +454,14 @@ feat(project): support spreadsheet import and project persistence
 - [x] ✅ 统一导出面板。
 - [x] ✅ PNG 1×/2×/3×。
 - [x] ✅ 透明背景和白色背景。
-- [ ] 自定义宽高与锁定比例。
+- [x] ✅ 自定义宽高与锁定比例。
 - [x] ✅ 预设：16:9、4:3、A4 横/纵、公众号、小红书。
 - [x] ✅ 自定义文件名。
 - [x] ✅ PDF 导出。
 - [x] ✅ 清洗后 CSV 导出。
 - [ ] 复制图片。
 - [x] ✅ 复制数据洞察摘要文案。
-- [ ] 明确 SVG 能力边界。
+- [x] ✅ 导出面板明确 SVG 能力边界。
 - [ ] 若要求全图表 SVG，评估并接入 SVG 渲染器。
 - [ ] 导出前检查分辨率、背景和文字清晰度。
 
@@ -490,10 +490,10 @@ feat(export): add high-resolution image PDF and data export
 - [ ] iPhone 使用底部标签：数据、图表、样式。
 - [ ] 导出作为顶部主操作。
 - [ ] iPad 使用双栏布局。
-- [ ] 所有触控目标不小于 44×44px。
-- [ ] 避免依赖 hover。
+- [x] ✅ 所有移动端触控目标基础尺寸不小于 44×44px。
+- [x] ✅ 移动端核心操作不依赖 hover。
 - [x] ✅ 已使用标准 input 替换 contenteditable。
-- [ ] 适配安全区和横竖屏。
+- [x] ✅ 适配 iOS 安全区和基础横竖屏响应式布局。
 - [x] ✅ 接入系统文件选择器。
 - [ ] 接入系统分享面板。
 - [ ] 支持从 Files 打开项目和表格。
