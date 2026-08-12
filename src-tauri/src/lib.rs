@@ -11,6 +11,7 @@ pub fn run() {
             commands::read_text_file,
             commands::write_text_file,
             commands::write_base64_file,
+            commands::import_spreadsheet,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

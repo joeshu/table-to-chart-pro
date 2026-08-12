@@ -9,6 +9,8 @@ export interface ProjectDocument {
 }
 
 export interface OpenedProject { path: string | null; document: ProjectDocument }
+export interface ImportedSheet { name: string; headers: string[]; rows: string[][] }
+export interface ImportedWorkbook { path: string | null; name: string; sheets: ImportedSheet[] }
 
 function isTauri() { return '__TAURI_INTERNALS__' in window; }
 
@@ -19,6 +21,15 @@ export async function openProject(): Promise<OpenedProject | null> {
   if (!path || Array.isArray(path)) return null;
   const contents = await invoke<string>('read_text_file',{path});
   return { path, document: parseProject(contents) };
+}
+
+export async function importWorkbook(pathOverride?: string): Promise<ImportedWorkbook | null> {
+  if (!isTauri()) return importWorkbookInBrowser();
+  const [{ open }, { invoke }] = await Promise.all([import('@tauri-apps/plugin-dialog'), import('@tauri-apps/api/core')]);
+  const selected = pathOverride || await open({ multiple:false, directory:false, filters:[{name:'表格文件',extensions:['xlsx','xls','xlsb','ods','csv','tsv','txt']}] });
+  if (!selected || Array.isArray(selected)) return null;
+  const sheets = await invoke<ImportedSheet[]>('import_spreadsheet',{path:selected});
+  return { path:selected, name:selected.split(/[\\/]/).pop() || '导入表格', sheets };
 }
 
 export async function saveProject(document: ProjectDocument, currentPath: string | null, saveAs = false): Promise<string | null> {
@@ -44,7 +55,23 @@ export async function copyText(text:string):Promise<void>{
 
 export async function rememberRecent(path:string){
   if(!isTauri()){localStorage.setItem('recent-project',path);return;}
-  const {load}=await import('@tauri-apps/plugin-store');const store=await load('settings.json',{autoSave:true});await store.set('recentProject',path);
+  const {load}=await import('@tauri-apps/plugin-store');const store=await load('settings.json',{autoSave:true});const recent=(await store.get<string[]>('recentProjects'))??[];await store.set('recentProjects',[path,...recent.filter(item=>item!==path)].slice(0,8));
+}
+
+export async function getRecentProjects():Promise<string[]>{
+  if(!isTauri()){const value=localStorage.getItem('recent-project');return value?[value]:[];}
+  const {load}=await import('@tauri-apps/plugin-store');const store=await load('settings.json',{autoSave:true});return (await store.get<string[]>('recentProjects'))??[];
+}
+
+export async function saveDraft(document:ProjectDocument):Promise<void>{
+  const contents=JSON.stringify(document);
+  if(!isTauri()){localStorage.setItem('project-draft',contents);return;}
+  const {load}=await import('@tauri-apps/plugin-store');const store=await load('settings.json',{autoSave:true});await store.set('projectDraft',contents);
+}
+
+export async function loadDraft():Promise<ProjectDocument|null>{
+  const contents=!isTauri()?localStorage.getItem('project-draft'):(await (await import('@tauri-apps/plugin-store')).load('settings.json',{autoSave:true})).get<string>('projectDraft');
+  if(!contents)return null;try{return parseProject(await contents);}catch{return null;}
 }
 
 export function parseProject(contents:string):ProjectDocument{
@@ -54,4 +81,5 @@ export function parseProject(contents:string):ProjectDocument{
 }
 
 function openProjectInBrowser():Promise<OpenedProject|null>{return new Promise(resolve=>{const input=document.createElement('input');input.type='file';input.accept='.t2c,.json';input.onchange=async()=>{const file=input.files?.[0];if(!file)return resolve(null);resolve({path:null,document:parseProject(await file.text())});};input.click();});}
+function importWorkbookInBrowser():Promise<ImportedWorkbook|null>{return new Promise(resolve=>{const input=document.createElement('input');input.type='file';input.accept='.csv,.tsv,.txt';input.onchange=async()=>{const file=input.files?.[0];if(!file)return resolve(null);const {parseTable}=await import('../data/parser');const table=parseTable(await file.text());resolve({path:null,name:file.name,sheets:[{name:'数据',...table}]});};input.click();});}
 function downloadBlob(contents:string,name:string,type:string){const link=document.createElement('a');link.href=URL.createObjectURL(new Blob([contents],{type}));link.download=name;link.click();setTimeout(()=>URL.revokeObjectURL(link.href),1000);}

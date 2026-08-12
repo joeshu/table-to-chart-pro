@@ -2,7 +2,7 @@
 import { computed, ref } from 'vue';
 import type { DataIssue, DataTable } from '../types';
 const props = defineProps<{ table: DataTable; raw: string; issues: DataIssue[] }>();
-const emit = defineEmits<{ 'update:raw': [value: string]; parse: []; cell: [row: number, col: number, value: string]; header: [col: number, value: string]; addRow: []; deleteRows: [rows: number[]]; addColumn: []; deleteColumn: [col: number] }>();
+const emit = defineEmits<{ 'update:raw': [value: string]; parse: []; import: []; cell: [row: number, col: number, value: string]; header: [col: number, value: string]; addRow: []; deleteRows: [rows: number[]]; addColumn: []; deleteColumn: [col: number] }>();
 const mode = ref<'table' | 'paste'>('table');
 const selected = ref(new Set<number>());
 const errors = computed(() => props.issues.filter(issue => issue.level === 'error'));
@@ -19,7 +19,7 @@ function remove() { emit('deleteRows', [...selected.value]); selected.value = ne
       <button class="primary-command full" @click="emit('parse')">识别并更新</button>
     </div>
     <template v-else>
-      <div class="table-tools"><button @click="emit('addRow')">＋ 行</button><button @click="emit('addColumn')">＋ 列</button><button class="danger-text" :disabled="!selected.size" @click="remove">删除 {{ selected.size || '' }}</button></div>
+      <div class="table-tools"><button class="import-button" @click="emit('import')">导入文件</button><button @click="emit('addRow')">＋ 行</button><button @click="emit('addColumn')">＋ 列</button><button class="danger-text" :disabled="!selected.size" @click="remove">删除 {{ selected.size || '' }}</button></div>
       <div class="workspace-table-wrap">
         <table class="workspace-table">
           <thead><tr><th class="select-col"></th><th class="index-col">#</th><th v-for="(header,col) in table.headers" :key="col"><div class="column-head"><input :value="header" @change="emit('header',col,($event.target as HTMLInputElement).value)"><button v-if="table.headers.length>2" title="删除列" @click="emit('deleteColumn',col)">×</button></div></th></tr></thead>
