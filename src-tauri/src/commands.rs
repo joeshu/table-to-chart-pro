@@ -21,6 +21,15 @@ pub fn write_base64_file(path: String, contents: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+pub fn startup_files() -> Vec<String> {
+    std::env::args().skip(1).filter(|arg| is_supported_file(arg)).collect()
+}
+
+fn is_supported_file(path: &str) -> bool {
+    matches!(Path::new(path).extension().and_then(|value| value.to_str()).map(str::to_lowercase).as_deref(), Some("t2c" | "json" | "xlsx" | "xls" | "xlsb" | "ods" | "csv" | "tsv" | "txt"))
+}
+
+#[tauri::command]
 pub fn import_spreadsheet(path: String) -> Result<Vec<ImportedSheet>, String> {
     let file=Path::new(&path); let ext=file.extension().and_then(|v|v.to_str()).unwrap_or("").to_lowercase();
     match ext.as_str() { "xlsx"|"xls"|"xlsb"|"ods" => import_excel(file), "csv"|"tsv"|"txt" => import_delimited(file,&ext), _ => Err("不支持的表格文件格式".into()) }

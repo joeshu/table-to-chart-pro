@@ -54,6 +54,13 @@ export async function saveExportFile(contents:string,suggestedName:string,extens
 
 export async function savePng(dataUrl:string,suggestedName:string):Promise<boolean>{return saveExportFile(dataUrl,suggestedName,'png');}
 
+export async function shareImage(dataUrl:string,fileName:string,title:string):Promise<boolean>{
+  if(!navigator.share)return false;
+  const response=await fetch(dataUrl);const blob=await response.blob();const file=new File([blob],fileName,{type:'image/png'});
+  if(navigator.canShare&&!navigator.canShare({files:[file]}))return false;
+  await navigator.share({title,text:'由表格转图表 Pro 生成',files:[file]});return true;
+}
+
 export async function copyText(text:string):Promise<void>{
   if(isTauri()){const {writeText}=await import('@tauri-apps/plugin-clipboard-manager');await writeText(text);return;}
   await navigator.clipboard.writeText(text);

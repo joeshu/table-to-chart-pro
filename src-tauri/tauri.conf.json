@@ -5,5 +5,5 @@
   "identifier": "com.example.tabletochartpro",
   "build": { "beforeBuildCommand": "npm run build", "beforeDevCommand": "npm run dev", "devUrl": "http://localhost:5173", "frontendDist": "../dist" },
   "app": { "windows": [{ "title": "表格转图表 Pro", "width": 1200, "height": 820, "minWidth": 900, "minHeight": 650, "resizable": true }], "security": { "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' asset: http://asset.localhost data: blob:; connect-src 'self' ipc: http://ipc.localhost" } },
-  "bundle": { "active": true, "targets": "all", "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.ico", "icons/icon.png"] }
+  "bundle": { "active": true, "targets": "all", "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.ico", "icons/icon.png"], "fileAssociations": [{ "ext": ["t2c"], "name": "表格转图表项目", "description": "表格转图表 Pro 项目文件", "role": "Editor", "mimeType": "application/vnd.table-to-chart.project+json" }] }
 }
