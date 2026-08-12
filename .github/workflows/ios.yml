@@ -41,26 +41,41 @@ jobs:
           test -n "$PBX"
           perl -0pi -e 's/buildSettings = \{/buildSettings = {\n\t\t\t\tCODE_SIGNING_ALLOWED = NO;\n\t\t\t\tCODE_SIGNING_REQUIRED = NO;\n\t\t\t\tCODE_SIGN_IDENTITY = "";/g' "$PBX"
           grep -q 'CODE_SIGNING_ALLOWED = NO' "$PBX"
-      - name: Build unsigned iOS app without archive export
+      - name: Build iOS archive and extract unsigned app
         shell: bash
         run: |
-          PROJECT=$(find src-tauri/gen/apple -name '*.xcodeproj' -type d | head -1)
-          test -n "$PROJECT"
-          SCHEME=$(xcodebuild -project "$PROJECT" -list -json | python3 -c 'import json,sys; print(json.load(sys.stdin)["project"]["schemes"][0])')
-          xcodebuild -project "$PROJECT" -scheme "$SCHEME" -sdk iphoneos \
-            -configuration Release -destination 'generic/platform=iOS' \
-            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY='' \
-            CONFIGURATION_BUILD_DIR="$PWD/ios-build" build
-      - name: Package unsigned IPA
-        shell: bash
-        run: |
-          APP=$(find ios-build -name '*.app' -type d | head -1)
-          test -n "$APP" || { echo 'No iOS .app bundle found'; exit 1; }
+          set +e
+          cargo tauri ios build --ci --target aarch64 2>&1 | tee ios-build.log
+          BUILD_STATUS=${PIPESTATUS[0]}
+          set -e
+
+          ARCHIVE=$(find src-tauri/gen/apple "$HOME/Library/Developer/Xcode/Archives" /tmp \
+            -name '*.xcarchive' -type d 2>/dev/null | head -1)
+          APP=""
+          if [ -n "$ARCHIVE" ]; then
+            APP=$(find "$ARCHIVE/Products/Applications" -name '*.app' -type d 2>/dev/null | head -1)
+          fi
+
+          if [ -z "$APP" ]; then
+            echo "Tauri build exit code: $BUILD_STATUS"
+            echo 'No archived iOS .app bundle found'
+            tail -100 ios-build.log
+            exit "${BUILD_STATUS:-1}"
+          fi
+
+          if [ "$BUILD_STATUS" -ne 0 ] && ! grep -q 'No Team Found in Archive' ios-build.log; then
+            echo 'iOS build failed before the expected unsigned export limitation'
+            tail -100 ios-build.log
+            exit "$BUILD_STATUS"
+          fi
+
           rm -rf Payload
           mkdir Payload
           cp -R "$APP" Payload/
           zip -qry table-to-chart-pro-unsigned.ipa Payload
           unzip -t table-to-chart-pro-unsigned.ipa
+          test -s table-to-chart-pro-unsigned.ipa
+          echo "Packaged unsigned app from: $APP"
       - name: Upload unsigned IPA
         uses: actions/upload-artifact@v4
         with:
