@@ -1,0 +1,13 @@
+{
+  "$schema": "../gen/schemas/mobile-schema.json",
+  "identifier": "mobile-main",
+  "description": "Mobile permissions for project files and clipboard",
+  "windows": ["main"],
+  "platforms": ["iOS", "android"],
+  "permissions": [
+    "core:default",
+    "dialog:default",
+    "store:default",
+    "clipboard-manager:allow-write-text"
+  ]
+}

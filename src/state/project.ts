@@ -100,6 +100,13 @@ export function useProjectState() {
     const previous = snapshot(); table.value = emptyTable(); rawInput.value = '项目\t数值\n示例 A\t120\n示例 B\t180\n示例 C\t150'; commit(previous);
   }
   function setTheme(theme: AppTheme) { appTheme.value = theme; localStorage.setItem('app-theme', theme); }
+  function loadProject(data: DataTable, chart: ChartSettings) {
+    table.value = JSON.parse(JSON.stringify(data));
+    Object.assign(settings, chart);
+    rawInput.value = [table.value.headers.join('\t'), ...table.value.rows.map(row => row.join('\t'))].join('\n');
+    undoStack.value = []; redoStack.value = []; saved.value = true;
+  }
+  function markSaved() { saved.value = true; }
 
-  return { table, rawInput, settings, appTheme, zoom, saved, issues, hasErrors, undoStack, redoStack, parseRaw, updateCell, renameColumn, addRow, deleteRows, addColumn, deleteColumn, undo, redo, reset, setTheme };
+  return { table, rawInput, settings, appTheme, zoom, saved, issues, hasErrors, undoStack, redoStack, parseRaw, updateCell, renameColumn, addRow, deleteRows, addColumn, deleteColumn, undo, redo, reset, setTheme, loadProject, markSaved };
 }

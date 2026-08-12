@@ -1,18 +1,23 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watchEffect } from 'vue';
-import AppToolbar from './components/AppToolbar.vue';
-import DataPanel from './components/DataPanel.vue';
-import ChartCanvas from './components/ChartCanvas.vue';
-import PropertyPanel from './components/PropertyPanel.vue';
-import StatusBar from './components/StatusBar.vue';
-import { useProjectState, type AppTheme, type ChartSettings } from './state/project';
+import { computed,onMounted,onUnmounted,ref,watchEffect } from 'vue';
+import AppToolbar from './components/AppToolbar.vue';import DataPanel from './components/DataPanel.vue';import ChartCanvas from './components/ChartCanvas.vue';import PropertyPanel from './components/PropertyPanel.vue';import StatusBar from './components/StatusBar.vue';
+import { useProjectState,type AppTheme,type ChartSettings } from './state/project';
+import { copyText,openProject,rememberRecent,savePng,saveProject,type ProjectDocument } from './platform/native';
 
-const state=useProjectState(); const chart=ref<InstanceType<typeof ChartCanvas>>();
+const state=useProjectState(),chart=ref<InstanceType<typeof ChartCanvas>>(),currentPath=ref<string|null>(null),projectName=ref('未命名项目'),notice=ref('');
 const errorCount=computed(()=>state.issues.value.filter(i=>i.level==='error').length);
-function applyTheme(value:AppTheme){state.setTheme(value);}
-watchEffect(()=>{document.documentElement.dataset.theme=state.appTheme.value;});
+const fileLabel=computed(()=>currentPath.value?.split(/[\\/]/).pop()||projectName.value);
+function applyTheme(value:AppTheme){state.setTheme(value);}watchEffect(()=>{document.documentElement.dataset.theme=state.appTheme.value;});
 function changeSettings(value:Partial<ChartSettings>){Object.assign(state.settings,value);state.saved.value=false;}
-function keydown(event:KeyboardEvent){const mod=event.ctrlKey||event.metaKey;if(!mod)return;if(event.key.toLowerCase()==='z'){event.preventDefault();event.shiftKey?state.redo():state.undo();}else if(event.key.toLowerCase()==='y'){event.preventDefault();state.redo();}}
-onMounted(()=>window.addEventListener('keydown',keydown));onUnmounted(()=>window.removeEventListener('keydown',keydown));
+function documentValue():ProjectDocument{return{schemaVersion:1,metadata:{name:projectName.value,updatedAt:new Date().toISOString()},data:JSON.parse(JSON.stringify(state.table.value)),chart:JSON.parse(JSON.stringify(state.settings))};}
+async function handleOpen(){try{const opened=await openProject();if(!opened)return;state.loadProject(opened.document.data,opened.document.chart);currentPath.value=opened.path;projectName.value=opened.document.metadata.name||'未命名项目';if(opened.path)await rememberRecent(opened.path);showNotice('项目已打开');}catch(error){showNotice(`打开失败：${message(error)}`,true);}}
+async function handleSave(saveAs=false){try{const path=await saveProject(documentValue(),currentPath.value,saveAs);if(path){currentPath.value=path;await rememberRecent(path);}state.markSaved();showNotice('项目已保存');}catch(error){showNotice(`保存失败：${message(error)}`,true);}}
+async function handleExport(){try{const data=chart.value?.getPngDataUrl();if(!data)return showNotice('图表尚未准备好',true);if(await savePng(data,`${projectName.value}.png`))showNotice('PNG 已导出');}catch(error){showNotice(`导出失败：${message(error)}`,true);}}
+async function handleCopy(){const text=`${state.settings.title}${state.settings.subtitle?`\n${state.settings.subtitle}`:''}\n${state.table.value.rows.length} 行数据，${state.table.value.headers.length-1} 个指标${state.settings.source?`\n数据来源：${state.settings.source}`:''}`;try{await copyText(text);showNotice('摘要已复制');}catch(error){showNotice(`复制失败：${message(error)}`,true);}}
+function handleReset(){if(!state.saved.value&&!confirm('当前项目有未保存更改，仍要新建吗？'))return;state.reset();currentPath.value=null;projectName.value='未命名项目';}
+function showNotice(text:string,error=false){notice.value=text;window.setTimeout(()=>{if(notice.value===text)notice.value='';},error?4500:2600);}function message(error:unknown){return error instanceof Error?error.message:String(error);}
+function keydown(event:KeyboardEvent){const mod=event.ctrlKey||event.metaKey;if(!mod)return;const key=event.key.toLowerCase();if(key==='z'){event.preventDefault();event.shiftKey?state.redo():state.undo();}else if(key==='y'){event.preventDefault();state.redo();}else if(key==='s'){event.preventDefault();void handleSave(event.shiftKey);}else if(key==='o'){event.preventDefault();void handleOpen();}}
+function beforeUnload(event:BeforeUnloadEvent){if(!state.saved.value){event.preventDefault();event.returnValue='';}}
+onMounted(()=>{window.addEventListener('keydown',keydown);window.addEventListener('beforeunload',beforeUnload);});onUnmounted(()=>{window.removeEventListener('keydown',keydown);window.removeEventListener('beforeunload',beforeUnload);});
 </script>
-<template><div class="app-frame"><AppToolbar :can-undo="Boolean(state.undoStack.value.length)" :can-redo="Boolean(state.redoStack.value.length)" :saved="state.saved.value" :theme="state.appTheme.value" @undo="state.undo" @redo="state.redo" @reset="state.reset" @export="chart?.download()" @theme="applyTheme"/><div class="workspace-grid"><DataPanel :table="state.table.value" :raw="state.rawInput.value" :issues="state.issues.value" @update:raw="state.rawInput.value=$event" @parse="state.parseRaw" @cell="state.updateCell" @header="state.renameColumn" @add-row="state.addRow" @delete-rows="state.deleteRows" @add-column="state.addColumn" @delete-column="state.deleteColumn"/><ChartCanvas ref="chart" :table="state.table.value" :settings="state.settings" :zoom="state.zoom.value" :has-errors="state.hasErrors.value"/><PropertyPanel :settings="state.settings" :numeric-columns="state.table.value.headers.length-1" @change="changeSettings"/></div><StatusBar :rows="state.table.value.rows.length" :cols="state.table.value.headers.length" :errors="errorCount" :saved="state.saved.value" :zoom="state.zoom.value" @zoom="state.zoom.value=$event"/></div></template>
+<template><div class="app-frame"><AppToolbar :can-undo="Boolean(state.undoStack.value.length)" :can-redo="Boolean(state.redoStack.value.length)" :saved="state.saved.value" :theme="state.appTheme.value" :file-name="fileLabel" @undo="state.undo" @redo="state.redo" @reset="handleReset" @open="handleOpen" @save="handleSave(false)" @save-as="handleSave(true)" @export="handleExport" @copy="handleCopy" @theme="applyTheme"/><div class="workspace-grid"><DataPanel :table="state.table.value" :raw="state.rawInput.value" :issues="state.issues.value" @update:raw="state.rawInput.value=$event" @parse="state.parseRaw" @cell="state.updateCell" @header="state.renameColumn" @add-row="state.addRow" @delete-rows="state.deleteRows" @add-column="state.addColumn" @delete-column="state.deleteColumn"/><ChartCanvas ref="chart" :table="state.table.value" :settings="state.settings" :zoom="state.zoom.value" :has-errors="state.hasErrors.value"/><PropertyPanel :settings="state.settings" :numeric-columns="state.table.value.headers.length-1" @change="changeSettings"/></div><StatusBar :rows="state.table.value.rows.length" :cols="state.table.value.headers.length" :errors="errorCount" :saved="state.saved.value" :zoom="state.zoom.value" @zoom="state.zoom.value=$event"/><div v-if="notice" class="native-notice">{{notice}}</div></div></template>
