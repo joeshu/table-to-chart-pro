@@ -30,6 +30,16 @@ export interface ChartSettings {
   smooth: boolean;
   areaFill: boolean;
   customColors: string[];
+  yMin: number | null;
+  yMax: number | null;
+  yStep: number | null;
+  valuePrefix: string;
+  valueSuffix: string;
+  percentageStacked: boolean;
+  connectGaps: boolean;
+  pieCutout: number;
+  pieRotation: number;
+  showTrendline: boolean;
 }
 
 const emptyTable = (): DataTable => ({ headers: ['项目', '数值'], rows: [['示例 A', '120'], ['示例 B', '180'], ['示例 C', '150']] });
@@ -42,7 +52,9 @@ export function useProjectState() {
     xAxisTitle: '', yAxisTitle: '', legendPosition: 'top', showLegend: true,
     showDataLabels: false, showGrid: true, animate: true, background: '#ffffff',
     numberFormat: 'number', decimals: 0, horizontal: false, stacked: false,
-    smooth: true, areaFill: false, customColors: [],
+    smooth: true, areaFill: false, customColors: [], yMin: null, yMax: null, yStep: null,
+    valuePrefix: '', valueSuffix: '', percentageStacked: false, connectGaps: false,
+    pieCutout: 55, pieRotation: 0, showTrendline: false,
   });
   const appTheme = ref<AppTheme>((localStorage.getItem('app-theme') as AppTheme) || 'system');
   const zoom = ref(100);

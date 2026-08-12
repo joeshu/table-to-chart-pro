@@ -37,15 +37,29 @@ export const dataLabelPlugin = {
 export function buildChartConfig(table: DataTable, settings: ChartSettings) {
   const basePalette=palettes[settings.theme], customColors=settings.customColors??[], palette={...basePalette,colors:customColors.length?customColors:basePalette.colors}, labels=table.rows.map(row=>row[0]);
   const numeric=(col:number)=>table.rows.map(row=>parseNumericValue(row[col]).value??0);
-  const formatter=(value:number)=>formatChartValue(value,settings.numberFormat,settings.decimals);
+  const numericNullable=(col:number)=>table.rows.map(row=>parseNumericValue(row[col]).value);
+  const formatter=(value:number)=>`${settings.valuePrefix??''}${formatChartValue(value,settings.numberFormat,settings.decimals)}${settings.valueSuffix??''}`;
   const tooltip={callbacks:{label:(context:any)=>`${context.dataset.label?`${context.dataset.label}: `:''}${formatter(Number(context.raw?.y??context.raw))}`}};
   const common:any={responsive:true,maintainAspectRatio:false,indexAxis:settings.type==='bar'&&settings.horizontal?'y':'x',animation:settings.animate?{duration:450}:false,plugins:{legend:{display:settings.showLegend,position:settings.legendPosition,labels:{color:palette.text,usePointStyle:true,padding:18}},title:{display:Boolean(settings.title),text:settings.title,color:palette.text,font:{size:18,weight:'600'},padding:{bottom:settings.subtitle?4:16}},subtitle:{display:Boolean(settings.subtitle),text:settings.subtitle,color:palette.text,font:{size:12,weight:'normal'},padding:{bottom:16}},tooltip,workspaceDataLabels:{enabled:settings.showDataLabels,color:palette.text,formatter}}};
-  if(settings.type==='pie'||settings.type==='doughnut') return {type:settings.type,data:{labels,datasets:[{label:table.headers[1],data:numeric(1),backgroundColor:palette.colors,borderColor:palette.background,borderWidth:2}]},options:common,plugins:[dataLabelPlugin]};
-  if(settings.type==='scatter') return {type:'scatter',data:{datasets:[{label:`${table.headers[1]} / ${table.headers[2]}`,data:table.rows.map(row=>({x:parseNumericValue(row[1]).value??0,y:parseNumericValue(row[2]).value??0})),backgroundColor:palette.colors[0]+'99',borderColor:palette.colors[0],pointRadius:6}]},options:{...common,scales:axes(palette,settings,formatter)},plugins:[dataLabelPlugin]};
+  if(settings.type==='pie'||settings.type==='doughnut') return {type:settings.type,data:{labels,datasets:[{label:table.headers[1],data:numeric(1),backgroundColor:palette.colors,borderColor:palette.background,borderWidth:2}]},options:{...common,rotation:(settings.pieRotation??0)*Math.PI/180,cutout:settings.type==='doughnut'?`${settings.pieCutout??55}%`:0},plugins:[dataLabelPlugin]};
+  if(settings.type==='scatter'){
+    const points=table.rows.map(row=>({x:parseNumericValue(row[1]).value??0,y:parseNumericValue(row[2]).value??0}));
+    const regression=linearRegression(points);const datasets:any[]=[{label:`${table.headers[1]} / ${table.headers[2]}`,data:points,backgroundColor:palette.colors[0]+'99',borderColor:palette.colors[0],pointRadius:6}];
+    if(settings.showTrendline&&regression)datasets.push({type:'line',label:`趋势线 R²=${regression.r2.toFixed(3)}`,data:regression.line,borderColor:palette.colors[1]??'#d64545',borderWidth:2,pointRadius:0,fill:false});
+    return {type:'scatter',data:{datasets},options:{...common,scales:axes(palette,settings,formatter)},plugins:[dataLabelPlugin]};
+  }
   if(settings.type==='bubble') return {type:'bubble',data:{datasets:[{label:`${table.headers[1]} / ${table.headers[2]}`,data:table.rows.map(row=>({x:parseNumericValue(row[1]).value??0,y:parseNumericValue(row[2]).value??0,r:Math.max(4,Math.sqrt(Math.abs(parseNumericValue(row[3]).value??10))*2)})),backgroundColor:palette.colors[0]+'77',borderColor:palette.colors[0]}]},options:{...common,scales:axes(palette,settings,formatter)},plugins:[dataLabelPlugin]};
   if(settings.type==='waterfall'){
     let running=0;const values=numeric(1),data=values.map(value=>{const start=running;running+=value;return[start,running];});
     return {type:'bar',data:{labels,datasets:[{label:table.headers[1],data,backgroundColor:values.map(value=>value>=0?'#168a62':'#d64545'),borderRadius:5}]},options:{...common,plugins:{...common.plugins,tooltip:{callbacks:{label:(context:any)=>`${formatter(values[context.dataIndex])}，累计 ${formatter(data[context.dataIndex][1])}`}}},scales:axes(palette,settings,formatter)},plugins:[dataLabelPlugin]};
+  }
+  if(settings.type==='heatmap'){
+    const matrix=table.rows.flatMap((row,rowIndex)=>row.slice(1).map((value,colIndex)=>({x:colIndex,y:rowIndex,v:parseNumericValue(value).value??0}))),values=matrix.map(item=>item.v),min=Math.min(...values),max=Math.max(...values);
+    return {type:'scatter',data:{datasets:[{label:'热力值',data:matrix,parsing:{xAxisKey:'x',yAxisKey:'y'},pointStyle:'rectRounded',pointRadius:18,pointHoverRadius:20,backgroundColor:matrix.map(item=>heatColor(item.v,min,max,palette.colors[0]))}]},options:{...common,plugins:{...common.plugins,legend:{display:false},tooltip:{callbacks:{label:(context:any)=>`${table.rows[context.raw.y][0]} / ${table.headers[context.raw.x+1]}: ${formatter(context.raw.v)}`}}},scales:{x:{min:-.5,max:table.headers.length-1.5,ticks:{stepSize:1,color:palette.text,callback:(value:any)=>table.headers[Number(value)+1]??''},grid:{display:false}},y:{min:-.5,max:table.rows.length-.5,reverse:true,ticks:{stepSize:1,color:palette.text,callback:(value:any)=>table.rows[Number(value)]?.[0]??''},grid:{display:false}}}},plugins:[dataLabelPlugin]};
+  }
+  if(settings.type==='funnel'){
+    const values=numeric(1),first=values[0]??0;
+    return {type:'bar',data:{labels,datasets:[{label:table.headers[1],data:values,backgroundColor:values.map((_,index)=>palette.colors[index%palette.colors.length]),borderRadius:6}]},options:{...common,indexAxis:'y',plugins:{...common.plugins,legend:{display:false},tooltip:{callbacks:{label:(context:any)=>`${formatter(context.raw)}${first?`，占首环节 ${(context.raw/first*100).toFixed(1)}%`:''}`}}},scales:{x:{beginAtZero:true,grid:{display:settings.showGrid,color:palette.grid},ticks:{color:palette.text,callback:(value:any)=>formatter(Number(value))}},y:{grid:{display:false},ticks:{color:palette.text}}}},plugins:[dataLabelPlugin]};
   }
   if(settings.type==='combo'){
     const datasets=table.headers.slice(1).map((header,index)=>index===0?{type:'bar',label:header,data:numeric(index+1),backgroundColor:palette.colors[0],borderRadius:5,yAxisID:'y'}:{type:'line',label:header,data:numeric(index+1),borderColor:palette.colors[index%palette.colors.length],backgroundColor:palette.colors[index%palette.colors.length]+'22',tension:.34,pointRadius:4,yAxisID:'y1'});
@@ -53,14 +67,20 @@ export function buildChartConfig(table: DataTable, settings: ChartSettings) {
     return {type:'bar',data:{labels,datasets},options:{...common,scales},plugins:[dataLabelPlugin]};
   }
   const type=(settings.type==='heatmap'||settings.type==='funnel'?'bar':settings.type==='area'?'line':settings.type) as ChartType;
-  const forceArea=settings.type==='area';
-  const datasets=table.headers.slice(1).map((header,index)=>({label:header,data:numeric(index+1),backgroundColor:type==='line'||type==='radar'?(forceArea||settings.areaFill||type==='radar'?palette.colors[index%palette.colors.length]+'33':'transparent'):palette.colors[index%palette.colors.length],borderColor:palette.colors[index%palette.colors.length],borderWidth:2,borderRadius:type==='bar'?5:0,tension:settings.smooth?.36:0,fill:type==='radar'||forceArea||(type==='line'&&settings.areaFill),stack:settings.stacked?'main':undefined,pointRadius:type==='line'?3:undefined}));
+  const forceArea=settings.type==='area',rawSeries=table.headers.slice(1).map((_,index)=>numeric(index+1)),totals=table.rows.map((_,rowIndex)=>rawSeries.reduce((sum,series)=>sum+Math.max(0,series[rowIndex]),0));
+  const datasets=table.headers.slice(1).map((header,index)=>({label:header,data:settings.percentageStacked?rawSeries[index].map((value,rowIndex)=>totals[rowIndex]?value/totals[rowIndex]*100:0):(type==='line'?numericNullable(index+1):rawSeries[index]),backgroundColor:type==='line'||type==='radar'?(forceArea||settings.areaFill||type==='radar'?palette.colors[index%palette.colors.length]+'33':'transparent'):palette.colors[index%palette.colors.length],borderColor:palette.colors[index%palette.colors.length],borderWidth:2,borderRadius:type==='bar'?5:0,tension:settings.smooth?.36:0,fill:type==='radar'||forceArea||(type==='line'&&settings.areaFill),spanGaps:settings.connectGaps,stack:settings.stacked?'main':undefined,pointRadius:type==='line'?3:undefined}));
   const options=type==='radar'?{...common,scales:{r:{grid:{display:settings.showGrid,color:palette.grid},pointLabels:{color:palette.text},ticks:{display:false}}}}:{...common,scales:axes(palette,settings,formatter)};
   return {type,data:{labels,datasets},options,plugins:[dataLabelPlugin]};
 }
 
 function axes(palette:{text:string;grid:string},settings:ChartSettings,formatter:(value:number)=>string){
   const category={stacked:settings.stacked,title:{display:Boolean(settings.xAxisTitle),text:settings.xAxisTitle,color:palette.text},grid:{display:false},ticks:{color:palette.text,maxRotation:40}};
-  const value={stacked:settings.stacked,beginAtZero:true,title:{display:Boolean(settings.yAxisTitle),text:settings.yAxisTitle,color:palette.text},grid:{display:settings.showGrid,color:palette.grid},ticks:{color:palette.text,callback:(value:any)=>formatter(Number(value))}};
+  const value={stacked:settings.stacked,beginAtZero:settings.yMin===null||settings.yMin===undefined,min:settings.percentageStacked?0:(settings.yMin??undefined),max:settings.percentageStacked?100:(settings.yMax??undefined),title:{display:Boolean(settings.yAxisTitle),text:settings.yAxisTitle,color:palette.text},grid:{display:settings.showGrid,color:palette.grid},ticks:{stepSize:settings.yStep??undefined,color:palette.text,callback:(value:any)=>settings.percentageStacked?`${Number(value).toFixed(0)}%`:formatter(Number(value))}};
   return settings.type==='bar'&&settings.horizontal?{x:value,y:category}:{x:category,y:value};
 }
+
+function linearRegression(points:{x:number;y:number}[]){
+  if(points.length<2)return null;const n=points.length,sumX=points.reduce((sum,p)=>sum+p.x,0),sumY=points.reduce((sum,p)=>sum+p.y,0),sumXY=points.reduce((sum,p)=>sum+p.x*p.y,0),sumXX=points.reduce((sum,p)=>sum+p.x*p.x,0);const denominator=n*sumXX-sumX*sumX;if(denominator===0)return null;const slope=(n*sumXY-sumX*sumY)/denominator,intercept=(sumY-slope*sumX)/n,meanY=sumY/n;const ssTotal=points.reduce((sum,p)=>sum+(p.y-meanY)**2,0),ssResidual=points.reduce((sum,p)=>sum+(p.y-(slope*p.x+intercept))**2,0);const r2=ssTotal===0?1:1-ssResidual/ssTotal;const xs=points.map(p=>p.x),min=Math.min(...xs),max=Math.max(...xs);return{slope,intercept,r2,line:[{x:min,y:slope*min+intercept},{x:max,y:slope*max+intercept}]};
+}
+
+function heatColor(value:number,min:number,max:number,hex:string){const ratio=max===min?0.5:(value-min)/(max-min),color=hex.replace('#',''),r=parseInt(color.slice(0,2),16),g=parseInt(color.slice(2,4),16),b=parseInt(color.slice(4,6),16),mix=.12+ratio*.88;return`rgba(${Math.round(255+(r-255)*mix)},${Math.round(255+(g-255)*mix)},${Math.round(255+(b-255)*mix)},1)`;}
