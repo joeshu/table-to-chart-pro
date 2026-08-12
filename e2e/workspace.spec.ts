@@ -2,10 +2,12 @@ import { expect, test } from '@playwright/test';
 
 test('paste data, render chart and open export dialog', async ({ page }) => {
   await page.goto('/');
-  await expect(page.getByText('表格转图表')).toBeVisible();
   if ((page.viewportSize()?.width ?? 1000) <= 680) {
     await expect(page.getByRole('navigation', { name: '移动工作区' })).toBeVisible();
+    await expect(page.locator('.brand-mark')).toBeVisible();
     await page.getByRole('button', { name: '数据', exact: true }).click();
+  } else {
+    await expect(page.getByText('表格转图表')).toBeVisible();
   }
   await page.getByRole('button', { name: '粘贴' }).click();
   const input = page.getByPlaceholder('从 Excel、WPS 或 Numbers 粘贴数据');
