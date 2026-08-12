@@ -1,0 +1,9 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "表格转图表 Pro",
+  "version": "1.0.0",
+  "identifier": "com.example.tabletochartpro",
+  "build": { "frontendDist": "../" },
+  "app": { "windows": [{ "title": "表格转图表 Pro", "width": 1200, "height": 820, "minWidth": 900, "minHeight": 650, "resizable": true }], "security": { "csp": "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'" } },
+  "bundle": { "active": true, "targets": "all", "icon": [] }
+}

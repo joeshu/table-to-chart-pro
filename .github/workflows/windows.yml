@@ -1,0 +1,35 @@
+name: Windows Build
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Install dependencies
+        run: npm install
+      - name: Build Tauri application
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: .
+          tagName: app-v__VERSION__
+          releaseName: '表格转图表 Pro v__VERSION__'
+          releaseBody: 'Windows desktop build'
+          releaseDraft: true
+          prerelease: false
+      - name: Upload Windows installers
+        uses: actions/upload-artifact@v4
+        with:
+          name: table-to-chart-pro-windows
+          path: src-tauri/target/release/bundle/**/*

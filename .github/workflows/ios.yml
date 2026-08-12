@@ -1,0 +1,38 @@
+name: iOS IPA Build
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  build-ios:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios, x86_64-apple-ios
+      - name: Install Tauri CLI
+        run: cargo install tauri-cli --version '^2'
+      - name: Install frontend dependencies
+        run: npm install
+      - name: Build unsigned iOS app
+        run: cargo tauri ios build --ci --target aarch64-apple-ios
+      - name: Package unsigned IPA
+        shell: bash
+        run: |
+          APP=$(find src-tauri/gen/apple/build -name '*.app' -type d | head -1)
+          test -n "$APP"
+          mkdir -p Payload
+          cp -R "$APP" Payload/
+          zip -r table-to-chart-pro-unsigned.ipa Payload
+      - name: Upload unsigned IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: table-to-chart-pro-unsigned-ipa
+          path: table-to-chart-pro-unsigned.ipa
