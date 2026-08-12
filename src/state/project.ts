@@ -6,14 +6,29 @@ import type { ChartType, DataTable } from '../types';
 export type ThemeName = 'business' | 'ocean' | 'forest' | 'sunset' | 'dark' | 'rose';
 export type AppTheme = 'system' | 'light' | 'dark';
 
+export type LegendPosition = 'top' | 'bottom' | 'left' | 'right';
+export type NumberFormat = 'number' | 'compact' | 'percent' | 'currency';
+
 export interface ChartSettings {
   type: ChartType;
   theme: ThemeName;
   title: string;
+  subtitle: string;
+  source: string;
+  xAxisTitle: string;
+  yAxisTitle: string;
+  legendPosition: LegendPosition;
   showLegend: boolean;
   showDataLabels: boolean;
+  showGrid: boolean;
   animate: boolean;
   background: string;
+  numberFormat: NumberFormat;
+  decimals: number;
+  horizontal: boolean;
+  stacked: boolean;
+  smooth: boolean;
+  areaFill: boolean;
 }
 
 const emptyTable = (): DataTable => ({ headers: ['项目', '数值'], rows: [['示例 A', '120'], ['示例 B', '180'], ['示例 C', '150']] });
@@ -21,7 +36,13 @@ const emptyTable = (): DataTable => ({ headers: ['项目', '数值'], rows: [['�
 export function useProjectState() {
   const table = ref<DataTable>(emptyTable());
   const rawInput = ref('项目\t数值\n示例 A\t120\n示例 B\t180\n示例 C\t150');
-  const settings = reactive<ChartSettings>({ type: 'bar', theme: 'business', title: '数据可视化', showLegend: true, showDataLabels: false, animate: true, background: '#ffffff' });
+  const settings = reactive<ChartSettings>({
+    type: 'bar', theme: 'business', title: '数据可视化', subtitle: '', source: '',
+    xAxisTitle: '', yAxisTitle: '', legendPosition: 'top', showLegend: true,
+    showDataLabels: false, showGrid: true, animate: true, background: '#ffffff',
+    numberFormat: 'number', decimals: 0, horizontal: false, stacked: false,
+    smooth: true, areaFill: false,
+  });
   const appTheme = ref<AppTheme>((localStorage.getItem('app-theme') as AppTheme) || 'system');
   const zoom = ref(100);
   const saved = ref(true);
