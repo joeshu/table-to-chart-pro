@@ -76,8 +76,10 @@ export async function saveDraft(document:ProjectDocument):Promise<void>{
 }
 
 export async function loadDraft():Promise<ProjectDocument|null>{
-  const contents=!isTauri()?localStorage.getItem('project-draft'):(await (await import('@tauri-apps/plugin-store')).load('settings.json',{autoSave:true})).get<string>('projectDraft');
-  if(!contents)return null;try{return parseProject(await contents);}catch{return null;}
+  let contents:string|null|undefined;
+  if(!isTauri())contents=localStorage.getItem('project-draft');
+  else{const {load}=await import('@tauri-apps/plugin-store');const store=await load('settings.json',{autoSave:true});contents=await store.get<string>('projectDraft');}
+  if(!contents)return null;try{return parseProject(contents);}catch{return null;}
 }
 
 export function parseProject(contents:string):ProjectDocument{
