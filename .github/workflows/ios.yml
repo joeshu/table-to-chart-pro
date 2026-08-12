@@ -1,38 +1,53 @@
 name: iOS IPA Build
+
 on:
   workflow_dispatch:
   push:
     branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build-ios:
     runs-on: macos-14
     steps:
       - uses: actions/checkout@v4
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
         with:
-          targets: aarch64-apple-ios, x86_64-apple-ios
+          targets: aarch64-apple-ios
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - name: Install dependencies
+        run: npm ci
       - name: Install Tauri CLI
-        run: cargo install tauri-cli --version '^2'
-      - name: Install frontend dependencies
-        run: npm install
+        run: cargo install tauri-cli --version '^2' --locked
+      - name: Initialize iOS project
+        run: cargo tauri ios init --ci
       - name: Build unsigned iOS app
-        run: cargo tauri ios build --ci --target aarch64-apple-ios
+        run: cargo tauri ios build --ci --target aarch64
       - name: Package unsigned IPA
         shell: bash
         run: |
-          APP=$(find src-tauri/gen/apple/build -name '*.app' -type d | head -1)
-          test -n "$APP"
-          mkdir -p Payload
+          APP=$(find src-tauri/gen/apple -name '*.app' -type d ! -path '*simulator*' | head -1)
+          test -n "$APP" || { echo 'No iOS .app bundle found'; exit 1; }
+          rm -rf Payload
+          mkdir Payload
           cp -R "$APP" Payload/
-          zip -r table-to-chart-pro-unsigned.ipa Payload
+          zip -qry table-to-chart-pro-unsigned.ipa Payload
+          unzip -t table-to-chart-pro-unsigned.ipa
       - name: Upload unsigned IPA
         uses: actions/upload-artifact@v4
         with:
           name: table-to-chart-pro-unsigned-ipa
           path: table-to-chart-pro-unsigned.ipa
+          if-no-files-found: error

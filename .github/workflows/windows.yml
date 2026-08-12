@@ -1,35 +1,40 @@
 name: Windows Build
+
 on:
   push:
     branches: [main]
   workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build-windows:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-      - name: Install dependencies
-        run: npm install
-      - name: Build Tauri application
-        uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
         with:
-          projectPath: .
-          tagName: app-v__VERSION__
-          releaseName: '表格转图表 Pro v__VERSION__'
-          releaseBody: 'Windows desktop build'
-          releaseDraft: true
-          prerelease: false
+          workspaces: src-tauri
+      - name: Install dependencies
+        run: npm ci
+      - name: Check Rust
+        working-directory: src-tauri
+        run: cargo check --locked
+      - name: Build Tauri application
+        run: npm run tauri build
       - name: Upload Windows installers
         uses: actions/upload-artifact@v4
         with:
           name: table-to-chart-pro-windows
           path: src-tauri/target/release/bundle/**/*
+          if-no-files-found: error
