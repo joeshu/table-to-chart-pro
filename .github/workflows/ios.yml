@@ -41,35 +41,35 @@ jobs:
           test -n "$PBX"
           perl -0pi -e 's/buildSettings = \{/buildSettings = {\n\t\t\t\tCODE_SIGNING_ALLOWED = NO;\n\t\t\t\tCODE_SIGNING_REQUIRED = NO;\n\t\t\t\tCODE_SIGN_IDENTITY = "";/g' "$PBX"
           grep -q 'CODE_SIGNING_ALLOWED = NO' "$PBX"
-      - name: Build iOS archive and extract unsigned app
+      - name: Build iOS application
+        id: ios-build
+        continue-on-error: true
+        shell: bash
+        run: cargo tauri ios build --ci --target aarch64 2>&1 | tee ios-build.log
+      - name: Package verified unsigned IPA
         shell: bash
         run: |
-          set +e
-          cargo tauri ios build --ci --target aarch64 2>&1 | tee ios-build.log
-          BUILD_STATUS=${PIPESTATUS[0]}
-          set -e
-
-          ARCHIVE=$(find src-tauri/gen/apple "$HOME/Library/Developer/Xcode/Archives" /tmp \
-            -name '*.xcarchive' -type d 2>/dev/null | head -1)
-          APP=""
-          if [ -n "$ARCHIVE" ]; then
-            APP=$(find "$ARCHIVE/Products/Applications" -name '*.app' -type d 2>/dev/null | head -1)
-          fi
+          APP=$(find "$HOME/Library/Developer/Xcode/DerivedData" \
+            -path '*/Build/Products/release-iphoneos/*.app' -type d 2>/dev/null | head -1)
 
           if [ -z "$APP" ]; then
-            echo "Tauri build exit code: $BUILD_STATUS"
-            echo 'No archived iOS .app bundle found'
-            tail -100 ios-build.log
-            exit "${BUILD_STATUS:-1}"
+            echo 'No release iOS .app bundle found after Tauri build'
+            tail -120 ios-build.log || true
+            exit 1
           fi
 
-          if [ "$BUILD_STATUS" -ne 0 ] && ! grep -q 'No Team Found in Archive' ios-build.log; then
-            echo 'iOS build failed before the expected unsigned export limitation'
-            tail -100 ios-build.log
-            exit "$BUILD_STATUS"
+          test -f "$APP/Info.plist"
+          EXECUTABLE=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$APP/Info.plist")
+          test -n "$EXECUTABLE"
+          test -f "$APP/$EXECUTABLE"
+
+          if [ "${{ steps.ios-build.outcome }}" = "failure" ] && ! grep -q 'No Team Found in Archive' ios-build.log; then
+            echo 'Tauri build failed for a reason other than the expected unsigned export limitation'
+            tail -120 ios-build.log
+            exit 1
           fi
 
-          rm -rf Payload
+          rm -rf Payload table-to-chart-pro-unsigned.ipa
           mkdir Payload
           cp -R "$APP" Payload/
           zip -qry table-to-chart-pro-unsigned.ipa Payload
