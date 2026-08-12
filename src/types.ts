@@ -17,4 +17,4 @@ export interface NumericResult {
   kind: 'number' | 'percent' | 'empty' | 'invalid';
 }
 
-export type ChartType = 'bar' | 'line' | 'pie' | 'doughnut' | 'radar' | 'scatter' | 'heatmap' | 'funnel';
+export type ChartType = 'bar' | 'line' | 'area' | 'combo' | 'pie' | 'doughnut' | 'radar' | 'scatter' | 'bubble' | 'waterfall' | 'heatmap' | 'funnel';

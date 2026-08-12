@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "node scripts/sync-version.mjs && vite build",
     "typecheck": "vue-tsc --noEmit",
     "test": "vitest run",
     "check": "npm run typecheck && npm test && npm run build",

@@ -35,15 +35,26 @@ export const dataLabelPlugin = {
 };
 
 export function buildChartConfig(table: DataTable, settings: ChartSettings) {
-  const palette=palettes[settings.theme], labels=table.rows.map(row=>row[0]);
+  const basePalette=palettes[settings.theme], customColors=settings.customColors??[], palette={...basePalette,colors:customColors.length?customColors:basePalette.colors}, labels=table.rows.map(row=>row[0]);
   const numeric=(col:number)=>table.rows.map(row=>parseNumericValue(row[col]).value??0);
   const formatter=(value:number)=>formatChartValue(value,settings.numberFormat,settings.decimals);
   const tooltip={callbacks:{label:(context:any)=>`${context.dataset.label?`${context.dataset.label}: `:''}${formatter(Number(context.raw?.y??context.raw))}`}};
   const common:any={responsive:true,maintainAspectRatio:false,indexAxis:settings.type==='bar'&&settings.horizontal?'y':'x',animation:settings.animate?{duration:450}:false,plugins:{legend:{display:settings.showLegend,position:settings.legendPosition,labels:{color:palette.text,usePointStyle:true,padding:18}},title:{display:Boolean(settings.title),text:settings.title,color:palette.text,font:{size:18,weight:'600'},padding:{bottom:settings.subtitle?4:16}},subtitle:{display:Boolean(settings.subtitle),text:settings.subtitle,color:palette.text,font:{size:12,weight:'normal'},padding:{bottom:16}},tooltip,workspaceDataLabels:{enabled:settings.showDataLabels,color:palette.text,formatter}}};
   if(settings.type==='pie'||settings.type==='doughnut') return {type:settings.type,data:{labels,datasets:[{label:table.headers[1],data:numeric(1),backgroundColor:palette.colors,borderColor:palette.background,borderWidth:2}]},options:common,plugins:[dataLabelPlugin]};
   if(settings.type==='scatter') return {type:'scatter',data:{datasets:[{label:`${table.headers[1]} / ${table.headers[2]}`,data:table.rows.map(row=>({x:parseNumericValue(row[1]).value??0,y:parseNumericValue(row[2]).value??0})),backgroundColor:palette.colors[0]+'99',borderColor:palette.colors[0],pointRadius:6}]},options:{...common,scales:axes(palette,settings,formatter)},plugins:[dataLabelPlugin]};
-  const type=(settings.type==='heatmap'||settings.type==='funnel'?'bar':settings.type) as ChartType;
-  const datasets=table.headers.slice(1).map((header,index)=>({label:header,data:numeric(index+1),backgroundColor:type==='line'||type==='radar'?(settings.areaFill||type==='radar'?palette.colors[index%palette.colors.length]+'33':'transparent'):palette.colors[index%palette.colors.length],borderColor:palette.colors[index%palette.colors.length],borderWidth:2,borderRadius:type==='bar'?5:0,tension:settings.smooth?.36:0,fill:type==='radar'||(type==='line'&&settings.areaFill),stack:settings.stacked?'main':undefined,pointRadius:type==='line'?3:undefined}));
+  if(settings.type==='bubble') return {type:'bubble',data:{datasets:[{label:`${table.headers[1]} / ${table.headers[2]}`,data:table.rows.map(row=>({x:parseNumericValue(row[1]).value??0,y:parseNumericValue(row[2]).value??0,r:Math.max(4,Math.sqrt(Math.abs(parseNumericValue(row[3]).value??10))*2)})),backgroundColor:palette.colors[0]+'77',borderColor:palette.colors[0]}]},options:{...common,scales:axes(palette,settings,formatter)},plugins:[dataLabelPlugin]};
+  if(settings.type==='waterfall'){
+    let running=0;const values=numeric(1),data=values.map(value=>{const start=running;running+=value;return[start,running];});
+    return {type:'bar',data:{labels,datasets:[{label:table.headers[1],data,backgroundColor:values.map(value=>value>=0?'#168a62':'#d64545'),borderRadius:5}]},options:{...common,plugins:{...common.plugins,tooltip:{callbacks:{label:(context:any)=>`${formatter(values[context.dataIndex])}，累计 ${formatter(data[context.dataIndex][1])}`}}},scales:axes(palette,settings,formatter)},plugins:[dataLabelPlugin]};
+  }
+  if(settings.type==='combo'){
+    const datasets=table.headers.slice(1).map((header,index)=>index===0?{type:'bar',label:header,data:numeric(index+1),backgroundColor:palette.colors[0],borderRadius:5,yAxisID:'y'}:{type:'line',label:header,data:numeric(index+1),borderColor:palette.colors[index%palette.colors.length],backgroundColor:palette.colors[index%palette.colors.length]+'22',tension:.34,pointRadius:4,yAxisID:'y1'});
+    const scales:any=axes(palette,settings,formatter);scales.y1={position:'right',beginAtZero:true,grid:{display:false},ticks:{color:palette.text,callback:(value:any)=>formatter(Number(value))}};
+    return {type:'bar',data:{labels,datasets},options:{...common,scales},plugins:[dataLabelPlugin]};
+  }
+  const type=(settings.type==='heatmap'||settings.type==='funnel'?'bar':settings.type==='area'?'line':settings.type) as ChartType;
+  const forceArea=settings.type==='area';
+  const datasets=table.headers.slice(1).map((header,index)=>({label:header,data:numeric(index+1),backgroundColor:type==='line'||type==='radar'?(forceArea||settings.areaFill||type==='radar'?palette.colors[index%palette.colors.length]+'33':'transparent'):palette.colors[index%palette.colors.length],borderColor:palette.colors[index%palette.colors.length],borderWidth:2,borderRadius:type==='bar'?5:0,tension:settings.smooth?.36:0,fill:type==='radar'||forceArea||(type==='line'&&settings.areaFill),stack:settings.stacked?'main':undefined,pointRadius:type==='line'?3:undefined}));
   const options=type==='radar'?{...common,scales:{r:{grid:{display:settings.showGrid,color:palette.grid},pointLabels:{color:palette.text},ticks:{display:false}}}}:{...common,scales:axes(palette,settings,formatter)};
   return {type,data:{labels,datasets},options,plugins:[dataLabelPlugin]};
 }

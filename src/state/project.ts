@@ -29,6 +29,7 @@ export interface ChartSettings {
   stacked: boolean;
   smooth: boolean;
   areaFill: boolean;
+  customColors: string[];
 }
 
 const emptyTable = (): DataTable => ({ headers: ['项目', '数值'], rows: [['示例 A', '120'], ['示例 B', '180'], ['示例 C', '150']] });
@@ -41,7 +42,7 @@ export function useProjectState() {
     xAxisTitle: '', yAxisTitle: '', legendPosition: 'top', showLegend: true,
     showDataLabels: false, showGrid: true, animate: true, background: '#ffffff',
     numberFormat: 'number', decimals: 0, horizontal: false, stacked: false,
-    smooth: true, areaFill: false,
+    smooth: true, areaFill: false, customColors: [],
   });
   const appTheme = ref<AppTheme>((localStorage.getItem('app-theme') as AppTheme) || 'system');
   const zoom = ref(100);
@@ -107,7 +108,7 @@ export function useProjectState() {
   }
   function loadProject(data: DataTable, chart: ChartSettings) {
     table.value = JSON.parse(JSON.stringify(data));
-    Object.assign(settings, chart);
+    Object.assign(settings, chart, { customColors: chart.customColors ?? [] });
     rawInput.value = [table.value.headers.join('\t'), ...table.value.rows.map(row => row.join('\t'))].join('\n');
     undoStack.value = []; redoStack.value = []; saved.value = true;
   }
