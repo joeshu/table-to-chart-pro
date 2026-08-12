@@ -459,6 +459,11 @@
             .theme-grid { grid-template-columns: repeat(2, 1fr); }
         }
 
+        .data-quality { margin: 12px 0; padding: 12px 14px; border: 1px solid #f6c453; border-radius: 10px; background: #fffbeb; color: #7c4a03; font-size: 13px; }
+        .data-quality ul { margin: 6px 0 0 18px; }
+        .data-quality .error { color: #b42318; }
+        .cell-error { background: #fff1f0 !important; box-shadow: inset 0 0 0 2px #ef4444; }
+
         .toast {
             position: fixed;
             bottom: 24px;
@@ -536,7 +541,8 @@
                 <span class="tag" id="detectedType">柱状图</span>
                 <span class="ai-badge">🤖 可编辑</span>
             </div>
-            <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 10px;">点击任意单元格可直接修改数值，实时同步到图表数据</p>
+            <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 10px;">点击任意单元格可直接修改；异常数据会明确标出，不会静默转为 0</p>
+            <div id="dataQualityPanel" class="data-quality hidden" role="alert"></div>
             <div class="table-wrapper">
                 <table id="previewTable">
                     <thead><tr></tr></thead>
@@ -672,8 +678,8 @@
             <!-- AI Insight -->
             <div class="ai-insight" id="aiInsight">
                 <div class="ai-insight-header">
-                    🤖 AI 智能分析
-                    <span style="font-size: 12px; font-weight: 500; opacity: 0.8;">基于数据特征自动生成</span>
+                    📐 本地数据洞察
+                    <span style="font-size: 12px; font-weight: 500; opacity: 0.8;">仅在本设备计算，数据不会上传</span>
                 </div>
                 <div class="ai-insight-content" id="aiInsightContent">
                     正在分析数据...
@@ -690,6 +696,7 @@
         let currentTheme = 'business';
         let currentChartType = 'bar';
         let chartInstance = null;
+        let dataIssues = [];
 
         // ========== THEMES ==========
         const themes = {
@@ -803,28 +810,112 @@
             showToast('已重置，开始新的制作');
         }
 
-        // ========== PARSER ==========
+        // ========== SAFE PARSER ==========
+        function detectDelimiter(raw) {
+            const sample = raw.split(/\r?\n/).slice(0, 5).join('\n');
+            const candidates = ['\t', ',', ';'];
+            let best = '\t', score = -1;
+            candidates.forEach(delimiter => {
+                let quoted = false, count = 0;
+                for (let i = 0; i < sample.length; i++) {
+                    if (sample[i] === '"') quoted = !quoted;
+                    else if (!quoted && sample[i] === delimiter) count++;
+                }
+                if (count > score) { score = count; best = delimiter; }
+            });
+            return best;
+        }
+
+        function parseDelimited(raw, delimiter) {
+            const rows = []; let row = [], field = '', quoted = false;
+            for (let i = 0; i < raw.length; i++) {
+                const ch = raw[i];
+                if (ch === '"') {
+                    if (quoted && raw[i + 1] === '"') { field += '"'; i++; }
+                    else quoted = !quoted;
+                } else if (ch === delimiter && !quoted) {
+                    row.push(field.trim()); field = '';
+                } else if ((ch === '\n' || ch === '\r') && !quoted) {
+                    if (ch === '\r' && raw[i + 1] === '\n') i++;
+                    row.push(field.trim()); field = '';
+                    if (row.some(cell => cell !== '')) rows.push(row);
+                    row = [];
+                } else field += ch;
+            }
+            if (quoted) throw new Error('存在未闭合的双引号');
+            row.push(field.trim());
+            if (row.some(cell => cell !== '')) rows.push(row);
+            return rows;
+        }
+
+        function parseNumericValue(input) {
+            const original = String(input ?? '').trim();
+            if (!original || /^(n\/a|na|null|--|—)$/i.test(original)) return { value: null, kind: 'empty' };
+            let text = original.replace(/[￥¥$€£\s]/g, '');
+            const percent = text.endsWith('%');
+            if (percent) text = text.slice(0, -1);
+            let negative = false;
+            if (/^\(.+\)$/.test(text)) { negative = true; text = text.slice(1, -1); }
+            text = text.replace(/,/g, '');
+            if (!/^[+-]?(?:\d+\.?\d*|\.\d+)$/.test(text)) return { value: null, kind: 'invalid' };
+            let value = Number(text);
+            if (!Number.isFinite(value)) return { value: null, kind: 'invalid' };
+            if (negative) value = -Math.abs(value);
+            if (percent) value /= 100;
+            return { value, kind: percent ? 'percent' : 'number' };
+        }
+
+        function normalizeHeaders(headers) {
+            const seen = new Map();
+            return headers.map((header, index) => {
+                const base = header || `列${index + 1}`;
+                const count = (seen.get(base) || 0) + 1;
+                seen.set(base, count);
+                return count === 1 ? base : `${base}_${count}`;
+            });
+        }
+
+        function validateData() {
+            dataIssues = [];
+            parsedData.rows.forEach((row, rIdx) => {
+                for (let cIdx = 1; cIdx < parsedData.headers.length; cIdx++) {
+                    const result = parseNumericValue(row[cIdx]);
+                    if (result.kind === 'invalid') dataIssues.push({ level: 'error', row: rIdx, col: cIdx, message: `第 ${rIdx + 2} 行「${parsedData.headers[cIdx]}」不是有效数字：${row[cIdx]}` });
+                    else if (result.kind === 'empty') dataIssues.push({ level: 'warning', row: rIdx, col: cIdx, message: `第 ${rIdx + 2} 行「${parsedData.headers[cIdx]}」为空` });
+                }
+            });
+            renderDataQuality();
+            return !dataIssues.some(issue => issue.level === 'error');
+        }
+
+        function renderDataQuality() {
+            const panel = document.getElementById('dataQualityPanel');
+            if (!panel) return;
+            if (!dataIssues.length) { panel.classList.add('hidden'); panel.innerHTML = ''; return; }
+            const errors = dataIssues.filter(i => i.level === 'error').length;
+            const warnings = dataIssues.length - errors;
+            panel.classList.remove('hidden');
+            panel.innerHTML = `<strong>数据质量：${errors} 个错误，${warnings} 个提醒</strong><ul>${dataIssues.slice(0, 8).map(i => `<li class="${i.level}">${escapeHtml(i.message)}</li>`).join('')}</ul>${dataIssues.length > 8 ? `<small>另有 ${dataIssues.length - 8} 项未展开</small>` : ''}`;
+        }
+
         function parseData() {
-            const raw = document.getElementById('dataInput').value.trim();
+            const raw = document.getElementById('dataInput').value.replace(/^\uFEFF/, '').trim();
             if (!raw) { showToast('请先粘贴数据'); return; }
-
-            const lines = raw.split('\n').filter(l => l.trim());
-            if (lines.length < 2) { showToast('数据至少需要2行（表头+数据）'); return; }
-
-            const firstLine = lines[0];
-            const delimiter = firstLine.includes('\t') ? '\t' : ',';
-            const headers = firstLine.split(delimiter).map(h => h.trim());
-            const rows = lines.slice(1).map(line => line.split(delimiter).map(c => c.trim()));
-            const colCount = headers.length;
-            const validRows = rows.filter(r => r.length === colCount);
-
-            if (validRows.length === 0) { showToast('数据格式有误，请检查分隔符是否一致'); return; }
-
-            parsedData = { headers, rows: validRows };
-            renderPreviewTable();
-            updateInfo();
-            switchPanel(2);
-            showToast(`成功识别 ${validRows.length} 行数据，点击单元格可直接编辑`);
+            try {
+                const matrix = parseDelimited(raw, detectDelimiter(raw));
+                if (matrix.length < 2) { showToast('数据至少需要表头和一行数据'); return; }
+                const headers = normalizeHeaders(matrix[0]);
+                const colCount = headers.length;
+                const rows = [];
+                dataIssues = [];
+                matrix.slice(1).forEach((row, index) => {
+                    if (row.length !== colCount) dataIssues.push({ level: 'error', row: index, col: -1, message: `第 ${index + 2} 行有 ${row.length} 列，应为 ${colCount} 列` });
+                    rows.push([...row.slice(0, colCount), ...Array(Math.max(0, colCount - row.length)).fill('')]);
+                });
+                parsedData = { headers, rows };
+                renderPreviewTable(); updateInfo(); validateData(); switchPanel(2);
+                showToast(dataIssues.some(i => i.level === 'error') ? '已识别数据，请先修复标出的错误' : `成功识别 ${rows.length} 行数据`);
+            } catch (error) { showToast(`解析失败：${error.message}`); }
         }
 
         // ========== EDITABLE TABLE ==========
@@ -841,8 +932,8 @@
             parsedData.rows.forEach((row, rIdx) => {
                 let tr = '<tr>';
                 row.forEach((c, cIdx) => {
-                    const isLabel = cIdx === 0;
-                    tr += `<td contenteditable="${!isLabel}" onblur="updateCell(${rIdx}, ${cIdx}, this)" onkeydown="handleCellKey(event, this)">${escapeHtml(c)}</td>`;
+                    const invalid = cIdx > 0 && parseNumericValue(c).kind === 'invalid';
+                    tr += `<td class="${invalid ? 'cell-error' : ''}" contenteditable="true" onblur="updateCell(${rIdx}, ${cIdx}, this)" onkeydown="handleCellKey(event, this)">${escapeHtml(c)}</td>`;
                 });
                 tr += '</tr>';
                 tbody.innerHTML += tr;
@@ -852,6 +943,8 @@
         function updateCell(rIdx, cIdx, el) {
             const newVal = el.textContent.trim();
             parsedData.rows[rIdx][cIdx] = newVal;
+            validateData();
+            renderPreviewTable();
             showToast('数据已更新');
         }
 
@@ -943,6 +1036,7 @@
 
         // ========== GENERATE CHART ==========
         function generateChart() {
+            if (!validateData()) { showToast('请先修复数据错误再生成图表'); switchPanel(2); return; }
             switchPanel(4);
             setTimeout(() => {
                 if (currentChartType === 'funnel') {
@@ -971,7 +1065,7 @@
             const isScatter = currentChartType === 'scatter';
 
             if (isPie) {
-                const data = parsedData.rows.map(r => parseFloat(r[1]) || 0);
+                const data = parsedData.rows.map(r => parseNumericValue(r[1]).value ?? 0);
                 chartInstance = new Chart(ctx, {
                     type: currentChartType,
                     data: {
@@ -998,8 +1092,8 @@
                 });
             } else if (isScatter) {
                 const data = parsedData.rows.map(r => ({
-                    x: parseFloat(r[1]) || 0,
-                    y: parseFloat(r[2]) || 0
+                    x: parseNumericValue(r[1]).value ?? 0,
+                    y: parseNumericValue(r[2]).value ?? 0
                 }));
                 chartInstance = new Chart(ctx, {
                     type: 'scatter',
@@ -1035,7 +1129,7 @@
                 for (let i = 1; i < parsedData.headers.length; i++) {
                     datasets.push({
                         label: parsedData.headers[i],
-                        data: parsedData.rows.map(r => parseFloat(r[i]) || 0),
+                        data: parsedData.rows.map(r => parseNumericValue(r[i]).value ?? 0),
                         backgroundColor: currentChartType === 'line' || currentChartType === 'radar' ? theme.colors[i-1] + '30' : theme.colors[i-1],
                         borderColor: theme.colors[i-1],
                         borderWidth: 2,
@@ -1074,7 +1168,7 @@
 
             const container = document.getElementById('funnelContainer');
             const theme = themes[currentTheme];
-            const values = parsedData.rows.map(r => parseFloat(r[1]) || 0);
+            const values = parsedData.rows.map(r => parseNumericValue(r[1]).value ?? 0);
             const maxVal = Math.max(...values);
             const labels = parsedData.rows.map(r => r[0]);
 
@@ -1116,7 +1210,7 @@
             // Parse matrix: row labels in col 0, col headers in parsedData.headers[1:]
             const rowLabels = parsedData.rows.map(r => r[0]);
             const colLabels = parsedData.headers.slice(1);
-            const matrix = parsedData.rows.map(r => r.slice(1).map(v => parseFloat(v) || 0));
+            const matrix = parsedData.rows.map(r => r.slice(1).map(v => parseNumericValue(v).value ?? 0));
 
             const allValues = matrix.flat();
             const minVal = Math.min(...allValues);
@@ -1193,7 +1287,7 @@
             ctx.fillText('热力图分析', canvas.width / 2, pad - 5);
         }
 
-        // ========== AI INSIGHT ==========
+        // ========== LOCAL DATA INSIGHT ==========
         function generateAIInsight() {
             const content = document.getElementById('aiInsightContent');
             const insights = [];
@@ -1204,7 +1298,7 @@
 
             // Basic stats
             for (let col = 1; col < headers.length; col++) {
-                const values = rows.map(r => parseFloat(r[col]) || 0);
+                const values = rows.map(r => parseNumericValue(r[col]).value ?? 0);
                 const sum = values.reduce((a, b) => a + b, 0);
                 const avg = (sum / values.length).toFixed(1);
                 const max = Math.max(...values);
@@ -1221,7 +1315,8 @@
                     const first3 = values.slice(0, 3);
                     const lastAvg = last3.reduce((a,b) => a+b, 0) / last3.length;
                     const firstAvg = first3.reduce((a,b) => a+b, 0) / first3.length;
-                    const change = ((lastAvg - firstAvg) / firstAvg * 100).toFixed(1);
+                    const change = firstAvg === 0 ? null : ((lastAvg - firstAvg) / firstAvg * 100).toFixed(1);
+                    if (change === null) { insights.push('初期均值为 0，无法计算趋势变化率。'); continue; }
                     const trend = change > 0 ? '上升' : '下降';
                     insights.push(`近期（后3期）相比初期（前3期）呈<strong>${trend}趋势</strong>，变化幅度约为 <strong>${Math.abs(change)}%</strong>。`);
 
@@ -1229,7 +1324,7 @@
                     let maxGrowth = -Infinity;
                     let maxGrowthIdx = -1;
                     for (let i = 1; i < values.length; i++) {
-                        const growth = ((values[i] - values[i-1]) / values[i-1] * 100);
+                        const growth = values[i-1] === 0 ? -Infinity : ((values[i] - values[i-1]) / values[i-1] * 100);
                         if (growth > maxGrowth) { maxGrowth = growth; maxGrowthIdx = i; }
                     }
                     if (maxGrowthIdx > 0) {
@@ -1240,18 +1335,18 @@
 
             // Cross-column analysis
             if (numericCols >= 2) {
-                const col1 = rows.map(r => parseFloat(r[1]) || 0);
-                const col2 = rows.map(r => parseFloat(r[2]) || 0);
-                const ratios = col1.map((v, i) => col2[i] / v);
-                const avgRatio = (ratios.reduce((a,b) => a+b, 0) / ratios.length * 100).toFixed(1);
-                insights.push(`<strong>${headers[2]}</strong>占<strong>${headers[1]}</strong>的平均比例为 <strong>${avgRatio}%</strong>，可作为效率/转化率参考指标。`);
+                const col1 = rows.map(r => parseNumericValue(r[1]).value ?? 0);
+                const col2 = rows.map(r => parseNumericValue(r[2]).value ?? 0);
+                const ratios = col1.map((v, i) => v === 0 ? null : col2[i] / v).filter(v => v !== null);
+                const avgRatio = ratios.length ? (ratios.reduce((a,b) => a+b, 0) / ratios.length * 100).toFixed(1) : null;
+                insights.push(avgRatio === null ? `「${headers[1]}」均为 0，无法计算比例。` : `<strong>${headers[2]}</strong>占<strong>${headers[1]}</strong>的平均比例为 <strong>${avgRatio}%</strong>，可作为效率/转化率参考指标。`);
             }
 
             // Funnel specific
             if (currentChartType === 'funnel') {
-                const values = rows.map(r => parseFloat(r[1]) || 0);
-                const totalDrop = ((values[values.length-1] / values[0]) * 100).toFixed(1);
-                insights.push(`漏斗整体转化率为 <strong>${totalDrop}%</strong>，建议关注各环节流失原因，优化转化路径。`);
+                const values = rows.map(r => parseNumericValue(r[1]).value ?? 0);
+                const totalDrop = values[0] === 0 ? null : ((values[values.length-1] / values[0]) * 100).toFixed(1);
+                insights.push(totalDrop === null ? '漏斗首项为 0，无法计算整体转化率。' : `漏斗整体转化率为 <strong>${totalDrop}%</strong>，建议关注各环节流失原因，优化转化路径。`);
             }
 
             // Heatmap specific
@@ -1261,8 +1356,8 @@
 
             // Scatter specific
             if (currentChartType === 'scatter') {
-                const x = rows.map(r => parseFloat(r[1]) || 0);
-                const y = rows.map(r => parseFloat(r[2]) || 0);
+                const x = rows.map(r => parseNumericValue(r[1]).value ?? 0);
+                const y = rows.map(r => parseNumericValue(r[2]).value ?? 0);
                 const n = x.length;
                 const avgX = x.reduce((a,b) => a+b, 0) / n;
                 const avgY = y.reduce((a,b) => a+b, 0) / n;
@@ -1272,9 +1367,11 @@
                     denX += (x[i] - avgX) ** 2;
                     denY += (y[i] - avgY) ** 2;
                 }
-                const r = num / Math.sqrt(denX * denY);
+                const denominator = Math.sqrt(denX * denY);
+                if (denominator === 0) { insights.push('数据列无方差，无法计算相关系数。'); } else {
+                const r = num / denominator;
                 let relation = r > 0.7 ? '强正相关' : r > 0.3 ? '中等正相关' : r > -0.3 ? '相关性较弱' : r > -0.7 ? '中等负相关' : '强负相关';
-                insights.push(`<strong>${headers[1]}</strong>与<strong>${headers[2]}</strong>的相关系数约为 <strong>${r.toFixed(2)}</strong>，呈现<strong>${relation}</strong>关系。`);
+                insights.push(`<strong>${headers[1]}</strong>与<strong>${headers[2]}</strong>的相关系数约为 <strong>${r.toFixed(2)}</strong>，呈现<strong>${relation}</strong>关系。`); }
             }
 
             content.innerHTML = insights.map(s => `<p>${s}</p>`).join('');
