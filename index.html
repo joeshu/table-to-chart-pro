@@ -193,6 +193,7 @@
         }
         .btn:hover { transform: translateY(-1px); }
         .btn:active { transform: translateY(0); }
+        .btn:disabled { opacity: .45; cursor: not-allowed; transform: none; box-shadow: none; }
         .btn-primary {
             background: linear-gradient(135deg, var(--primary), var(--primary-dark));
             color: white;
@@ -239,6 +240,9 @@
         }
         th {
             background: #f8fafc;
+            position: sticky;
+            top: 0;
+            z-index: 2;
             font-weight: 700;
             color: var(--text-secondary);
             text-transform: uppercase;
@@ -262,6 +266,14 @@
         tr:hover td { background: #f8fafc; }
         tr:hover td[contenteditable="true"] { background: #fffbeb; }
         tr:hover td[contenteditable="true"]:hover { background: #fef3c7; }
+        .row-select, .row-number { min-width: 44px; width: 44px; text-align: center; position: sticky; left: 0; z-index: 1; background: #f8fafc !important; }
+        .row-number { left: 44px; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+        .editable-head { cursor: text; outline: none; }
+        .editable-head:focus { background: white; box-shadow: inset 0 0 0 2px var(--primary); }
+        .head-wrap { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+        .col-delete { border: 0; background: transparent; color: #94a3b8; cursor: pointer; padding: 2px 5px; border-radius: 5px; }
+        .col-delete:hover { color: var(--danger); background: #fee2e2; }
+        tr.row-selected td { background: #eef2ff !important; }
         .tag {
             display: inline-block;
             padding: 4px 10px;
@@ -462,6 +474,7 @@
         .data-quality { margin: 12px 0; padding: 12px 14px; border: 1px solid #f6c453; border-radius: 10px; background: #fffbeb; color: #7c4a03; font-size: 13px; }
         .data-quality ul { margin: 6px 0 0 18px; }
         .data-quality .error { color: #b42318; }
+        .issue-link { border: 0; background: none; color: inherit; padding: 1px 0; cursor: pointer; text-align: left; text-decoration: underline; }
         .cell-error { background: #fff1f0 !important; box-shadow: inset 0 0 0 2px #ef4444; }
 
         .toast {
@@ -479,9 +492,10 @@
             transition: transform 0.3s ease;
             z-index: 1000;
         }
-        .toast.show {
-            transform: translateX(-50%) translateY(0);
-        }
+        .toast.show { transform: translateX(-50%) translateY(0); }
+        .toast.success { background: #166534; }
+        .toast.warning { background: #92400e; }
+        .toast.error { background: #b42318; }
     </style>
 </head>
 <body>
@@ -550,10 +564,12 @@
                 </table>
             </div>
             <div class="edit-actions">
-                <button class="btn btn-secondary btn-sm" onclick="addRow()">➕ 添加行</button>
-                <button class="btn btn-danger btn-sm" onclick="removeLastRow()">➖ 删除末行</button>
-                <button class="btn btn-secondary btn-sm" onclick="addColumn()">➕ 添加列</button>
-                <span class="edit-hint">💡 提示：点击单元格即可编辑</span>
+                <button class="btn btn-secondary btn-sm" onclick="addRow()">＋ 添加行</button>
+                <button class="btn btn-danger btn-sm" id="deleteRowsBtn" onclick="deleteSelectedRows()" disabled>删除选中行</button>
+                <button class="btn btn-secondary btn-sm" onclick="addColumn()">＋ 添加列</button>
+                <button class="btn btn-secondary btn-sm" id="undoBtn" onclick="undo()" disabled title="Ctrl/Cmd + Z">↶ 撤销</button>
+                <button class="btn btn-secondary btn-sm" id="redoBtn" onclick="redo()" disabled title="Ctrl/Cmd + Shift + Z">↷ 重做</button>
+                <span class="edit-hint">双击表头可重命名；Tab / Enter 快速移动</span>
             </div>
             <div class="info-row">
                 <span>📌 <strong id="rowCount">0</strong> 行数据</span>
@@ -670,7 +686,7 @@
 
             <div class="export-actions">
                 <button class="btn btn-success" onclick="downloadPNG()">⬇️ 下载 PNG</button>
-                <button class="btn btn-primary" onclick="downloadSVG()">⬇️ 下载 SVG</button>
+                <button class="btn btn-primary" id="svgExportBtn" onclick="downloadSVG()">⬇️ 下载 SVG</button>
                 <button class="btn btn-secondary" onclick="copyToClipboard()">📋 复制到剪贴板</button>
                 <button class="btn btn-secondary" onclick="resetAll()">🔄 重新制作</button>
             </div>
@@ -697,6 +713,8 @@
         let currentChartType = 'bar';
         let chartInstance = null;
         let dataIssues = [];
+        let undoStack = [], redoStack = [], selectedRows = new Set(), editSnapshot = null;
+        const HISTORY_LIMIT = 50;
 
         // ========== THEMES ==========
         const themes = {
@@ -768,11 +786,36 @@
             document.getElementById('dataInput').value = '';
             document.getElementById('dataInput').focus();
         }
-        function showToast(msg) {
+        let toastTimer;
+        function showToast(msg, type = 'success') {
             const toast = document.getElementById('toast');
+            clearTimeout(toastTimer);
             toast.textContent = msg;
-            toast.classList.add('show');
-            setTimeout(() => toast.classList.remove('show'), 2500);
+            toast.className = `toast show ${type}`;
+            toastTimer = setTimeout(() => { toast.className = 'toast'; }, type === 'error' ? 4200 : 2500);
+        }
+        function cloneData(data = parsedData) { return data ? JSON.parse(JSON.stringify(data)) : null; }
+        function updateHistoryButtons() {
+            const undoBtn = document.getElementById('undoBtn'), redoBtn = document.getElementById('redoBtn');
+            if (undoBtn) undoBtn.disabled = !undoStack.length;
+            if (redoBtn) redoBtn.disabled = !redoStack.length;
+        }
+        function pushHistory(snapshot = cloneData()) {
+            if (!snapshot) return;
+            undoStack.push(snapshot); if (undoStack.length > HISTORY_LIMIT) undoStack.shift();
+            redoStack = []; updateHistoryButtons();
+        }
+        function restoreSnapshot(snapshot) {
+            parsedData = cloneData(snapshot); selectedRows.clear();
+            renderPreviewTable(); updateInfo(); validateData(); updateHistoryButtons();
+        }
+        function undo() {
+            if (!undoStack.length) return;
+            redoStack.push(cloneData()); restoreSnapshot(undoStack.pop()); showToast('已撤销');
+        }
+        function redo() {
+            if (!redoStack.length) return;
+            undoStack.push(cloneData()); restoreSnapshot(redoStack.pop()); showToast('已重做');
         }
         function escapeHtml(text) {
             const div = document.createElement('div');
@@ -799,7 +842,7 @@
         }
         function backTo(n) { switchPanel(n); }
         function resetAll() {
-            parsedData = null;
+            parsedData = null; undoStack = []; redoStack = []; selectedRows.clear(); updateHistoryButtons();
             currentChartType = 'bar';
             currentTheme = 'business';
             if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
@@ -895,7 +938,7 @@
             const errors = dataIssues.filter(i => i.level === 'error').length;
             const warnings = dataIssues.length - errors;
             panel.classList.remove('hidden');
-            panel.innerHTML = `<strong>数据质量：${errors} 个错误，${warnings} 个提醒</strong><ul>${dataIssues.slice(0, 8).map(i => `<li class="${i.level}">${escapeHtml(i.message)}</li>`).join('')}</ul>${dataIssues.length > 8 ? `<small>另有 ${dataIssues.length - 8} 项未展开</small>` : ''}`;
+            panel.innerHTML = `<strong>数据质量：${errors} 个错误，${warnings} 个提醒</strong><ul>${dataIssues.slice(0, 8).map(i => `<li class="${i.level}"><button class="issue-link" onclick="focusCell(${i.row},${i.col})">${escapeHtml(i.message)}</button></li>`).join('')}</ul>${dataIssues.length > 8 ? `<small>另有 ${dataIssues.length - 8} 项未展开</small>` : ''}`;
         }
 
         function parseData() {
@@ -912,7 +955,7 @@
                     if (row.length !== colCount) dataIssues.push({ level: 'error', row: index, col: -1, message: `第 ${index + 2} 行有 ${row.length} 列，应为 ${colCount} 列` });
                     rows.push([...row.slice(0, colCount), ...Array(Math.max(0, colCount - row.length)).fill('')]);
                 });
-                parsedData = { headers, rows };
+                parsedData = { headers, rows }; undoStack = []; redoStack = []; selectedRows.clear(); updateHistoryButtons();
                 renderPreviewTable(); updateInfo(); validateData(); switchPanel(2);
                 showToast(dataIssues.some(i => i.level === 'error') ? '已识别数据，请先修复标出的错误' : `成功识别 ${rows.length} 行数据`);
             } catch (error) { showToast(`解析失败：${error.message}`); }
@@ -922,65 +965,71 @@
         function renderPreviewTable() {
             const thead = document.querySelector('#previewTable thead tr');
             const tbody = document.querySelector('#previewTable tbody');
-            thead.innerHTML = '';
+            thead.innerHTML = `<th class="row-select"><input type="checkbox" aria-label="全选行" onchange="toggleAllRows(this.checked)" ${selectedRows.size === parsedData.rows.length && parsedData.rows.length ? 'checked' : ''}></th><th class="row-number">#</th>`;
             tbody.innerHTML = '';
-
             parsedData.headers.forEach((h, idx) => {
-                thead.innerHTML += `<th>${escapeHtml(h)}</th>`;
+                thead.innerHTML += `<th><div class="head-wrap"><span class="editable-head" contenteditable="true" onfocus="beginHeaderEdit(${idx})" onblur="renameColumn(${idx},this)" onkeydown="handleHeaderKey(event,this)">${escapeHtml(h)}</span>${parsedData.headers.length > 2 ? `<button class="col-delete" onclick="deleteColumn(${idx})" title="删除该列" aria-label="删除${escapeHtml(h)}列">×</button>` : ''}</div></th>`;
             });
-
             parsedData.rows.forEach((row, rIdx) => {
-                let tr = '<tr>';
+                let tr = `<tr class="${selectedRows.has(rIdx) ? 'row-selected' : ''}"><td class="row-select"><input type="checkbox" aria-label="选择第${rIdx + 1}行" ${selectedRows.has(rIdx) ? 'checked' : ''} onchange="toggleRow(${rIdx},this.checked)"></td><td class="row-number">${rIdx + 1}</td>`;
                 row.forEach((c, cIdx) => {
                     const invalid = cIdx > 0 && parseNumericValue(c).kind === 'invalid';
-                    tr += `<td class="${invalid ? 'cell-error' : ''}" contenteditable="true" onblur="updateCell(${rIdx}, ${cIdx}, this)" onkeydown="handleCellKey(event, this)">${escapeHtml(c)}</td>`;
+                    tr += `<td data-row="${rIdx}" data-col="${cIdx}" class="${invalid ? 'cell-error' : ''}" contenteditable="true" onfocus="beginCellEdit(${rIdx},${cIdx})" onblur="updateCell(${rIdx},${cIdx},this)" onkeydown="handleCellKey(event,this)">${escapeHtml(c)}</td>`;
                 });
-                tr += '</tr>';
-                tbody.innerHTML += tr;
+                tbody.innerHTML += tr + '</tr>';
             });
+            updateSelectionButtons();
         }
-
+        function beginCellEdit() { if (!editSnapshot) editSnapshot = cloneData(); }
+        function beginHeaderEdit() { if (!editSnapshot) editSnapshot = cloneData(); }
         function updateCell(rIdx, cIdx, el) {
-            const newVal = el.textContent.trim();
-            parsedData.rows[rIdx][cIdx] = newVal;
-            validateData();
-            renderPreviewTable();
-            showToast('数据已更新');
+            const newVal = el.textContent.trim(), oldVal = parsedData.rows[rIdx][cIdx];
+            if (newVal !== oldVal) { pushHistory(editSnapshot || cloneData()); parsedData.rows[rIdx][cIdx] = newVal; validateData(); updateInfo(); }
+            editSnapshot = null;
         }
-
+        function renameColumn(idx, el) {
+            const value = el.textContent.trim(), old = parsedData.headers[idx];
+            if (!value) { el.textContent = old; showToast('列名不能为空', 'error'); editSnapshot = null; return; }
+            if (value !== old) { pushHistory(editSnapshot || cloneData()); parsedData.headers[idx] = value; validateData(); updateInfo(); }
+            editSnapshot = null;
+        }
+        function handleHeaderKey(e, el) { if (e.key === 'Enter') { e.preventDefault(); el.blur(); } }
+        function focusCell(row, col) {
+            if (col < 0) { document.querySelector(`#previewTable tbody tr:nth-child(${row + 1})`)?.scrollIntoView({ block: 'center' }); return; }
+            const cell = document.querySelector(`[data-row="${row}"][data-col="${col}"]`);
+            cell?.scrollIntoView({ block: 'center', inline: 'center' }); cell?.focus();
+        }
+        function moveCell(el, delta) {
+            const cells = [...document.querySelectorAll('#previewTable tbody td[contenteditable="true"]')];
+            const next = cells[cells.indexOf(el) + delta]; if (next) next.focus(); else el.blur();
+        }
         function handleCellKey(e, el) {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                el.blur();
-            }
+            const cols = parsedData.headers.length;
+            if (e.key === 'Enter') { e.preventDefault(); moveCell(el, e.shiftKey ? -cols : cols); }
+            else if (e.key === 'Tab') { e.preventDefault(); moveCell(el, e.shiftKey ? -1 : 1); }
+            else if (e.key === 'ArrowDown' && e.altKey) { e.preventDefault(); moveCell(el, cols); }
+            else if (e.key === 'ArrowUp' && e.altKey) { e.preventDefault(); moveCell(el, -cols); }
         }
-
+        function toggleRow(idx, checked) { checked ? selectedRows.add(idx) : selectedRows.delete(idx); renderPreviewTable(); }
+        function toggleAllRows(checked) { selectedRows = checked ? new Set(parsedData.rows.map((_, i) => i)) : new Set(); renderPreviewTable(); }
+        function updateSelectionButtons() { const btn = document.getElementById('deleteRowsBtn'); if (btn) { btn.disabled = !selectedRows.size; btn.textContent = selectedRows.size ? `删除选中行 (${selectedRows.size})` : '删除选中行'; } }
+        function afterStructureChange(message) { selectedRows.clear(); renderPreviewTable(); updateInfo(); validateData(); showToast(message); }
         function addRow() {
-            const colCount = parsedData.headers.length;
-            const newRow = Array(colCount).fill('0');
-            newRow[0] = `新项${parsedData.rows.length + 1}`;
-            parsedData.rows.push(newRow);
-            renderPreviewTable();
-            updateInfo();
-            showToast('已添加新行');
+            pushHistory(); const row = Array(parsedData.headers.length).fill('0'); row[0] = `新项${parsedData.rows.length + 1}`;
+            parsedData.rows.push(row); afterStructureChange('已添加新行');
         }
-
-        function removeLastRow() {
-            if (parsedData.rows.length <= 1) { showToast('至少保留一行数据'); return; }
-            parsedData.rows.pop();
-            renderPreviewTable();
-            updateInfo();
-            showToast('已删除末行');
+        function deleteSelectedRows() {
+            if (!selectedRows.size) return;
+            if (selectedRows.size >= parsedData.rows.length) { showToast('至少保留一行数据', 'warning'); return; }
+            pushHistory(); parsedData.rows = parsedData.rows.filter((_, i) => !selectedRows.has(i)); afterStructureChange('已删除选中行，可撤销');
         }
-
         function addColumn() {
-            const colName = prompt('请输入新列名称:', '新指标');
-            if (!colName) return;
-            parsedData.headers.push(colName);
-            parsedData.rows.forEach(row => row.push('0'));
-            renderPreviewTable();
-            updateInfo();
-            showToast('已添加新列');
+            const name = prompt('请输入新列名称:', '新指标'); if (!name?.trim()) return;
+            pushHistory(); parsedData.headers.push(name.trim()); parsedData.rows.forEach(row => row.push('0')); afterStructureChange('已添加新列');
+        }
+        function deleteColumn(idx) {
+            if (parsedData.headers.length <= 2) { showToast('至少保留分类列和一个数据列', 'warning'); return; }
+            pushHistory(); parsedData.headers.splice(idx, 1); parsedData.rows.forEach(row => row.splice(idx, 1)); afterStructureChange('已删除该列，可撤销');
         }
 
         function updateInfo() {
@@ -1016,10 +1065,33 @@
             document.getElementById('detectedType').textContent = recommend;
             document.getElementById('recommendText').textContent = recommend;
             selectChartType(defaultType);
+            updateChartCompatibility();
+        }
+
+        function getChartCompatibility(type) {
+            if (!parsedData) return { ok: false, reason: '请先导入数据' };
+            const cols = parsedData.headers.length - 1;
+            const values = parsedData.rows.map(r => parseNumericValue(r[1]).value).filter(v => v !== null);
+            if (type === 'scatter' && cols < 2) return { ok: false, reason: '散点图至少需要两个数据列' };
+            if (type === 'heatmap' && (cols < 2 || parsedData.rows.length < 2)) return { ok: false, reason: '热力图至少需要 2×2 数值矩阵' };
+            if ((type === 'pie' || type === 'doughnut') && values.some(v => v < 0)) return { ok: false, reason: '饼图不支持负数' };
+            if ((type === 'pie' || type === 'doughnut') && values.reduce((a,b) => a+b, 0) <= 0) return { ok: false, reason: '饼图数据总和必须大于 0' };
+            if (type === 'funnel' && values.some(v => v < 0)) return { ok: false, reason: '漏斗图不支持负数' };
+            return { ok: true, reason: '' };
+        }
+        function updateChartCompatibility() {
+            document.querySelectorAll('.chart-type-btn').forEach(btn => {
+                const result = getChartCompatibility(btn.dataset.type);
+                btn.disabled = !result.ok; btn.title = result.reason;
+            });
+            const selected = getChartCompatibility(currentChartType);
+            if (!selected.ok) selectChartType('bar');
         }
 
         // ========== CHART TYPE & THEME ==========
         function selectChartType(type) {
+            const compatibility = getChartCompatibility(type);
+            if (!compatibility.ok) { showToast(compatibility.reason, 'warning'); return; }
             currentChartType = type;
             document.querySelectorAll('.chart-type-btn').forEach(btn => {
                 btn.classList.toggle('active', btn.dataset.type === type);
@@ -1031,6 +1103,7 @@
             currentTheme = theme;
         }
         function showThemes() {
+            updateChartCompatibility();
             switchPanel(3);
         }
 
@@ -1047,6 +1120,7 @@
                     renderChartJS();
                 }
                 generateAIInsight();
+                const svgBtn = document.getElementById('svgExportBtn'); if (svgBtn) { svgBtn.disabled = currentChartType !== 'funnel'; svgBtn.title = svgBtn.disabled ? '当前图表为 Canvas 渲染，请使用 PNG' : ''; }
             }, 100);
         }
 
@@ -1466,6 +1540,13 @@
                 showToast('复制失败，请使用下载功能');
             }
         }
+
+        document.addEventListener('keydown', event => {
+            const modifier = event.ctrlKey || event.metaKey;
+            if (!modifier) return;
+            if (event.key.toLowerCase() === 'z') { event.preventDefault(); event.shiftKey ? redo() : undo(); }
+            else if (event.key.toLowerCase() === 'y') { event.preventDefault(); redo(); }
+        });
 
         // Init
         document.addEventListener('DOMContentLoaded', () => {
