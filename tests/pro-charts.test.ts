@@ -3,7 +3,7 @@ import { buildChartConfig } from '../src/charts/config';
 import { projectTemplates } from '../src/templates/library';
 import type { ChartSettings } from '../src/state/project';
 
-const base:ChartSettings={type:'bar',theme:'business',title:'测试',subtitle:'',source:'',xAxisTitle:'',yAxisTitle:'',legendPosition:'top',showLegend:true,showDataLabels:false,showGrid:true,animate:false,background:'#fff',numberFormat:'number',decimals:0,horizontal:false,stacked:false,smooth:true,areaFill:false,customColors:[],yMin:null,yMax:null,yStep:null,valuePrefix:'',valueSuffix:'',percentageStacked:false,connectGaps:false,pieCutout:55,pieRotation:0,showTrendline:false};
+const base:ChartSettings={type:'bar',theme:'business',title:'测试',subtitle:'',source:'',xAxisTitle:'',yAxisTitle:'',legendPosition:'top',showLegend:true,showDataLabels:false,showGrid:true,animate:false,background:'#fff',numberFormat:'number',decimals:0,horizontal:false,stacked:false,smooth:true,areaFill:false,customColors:[],yMin:null,yMax:null,yStep:null,valuePrefix:'',valueSuffix:'',percentageStacked:false,connectGaps:false,pieCutout:55,pieRotation:0,showTrendline:false,pieCenterText:'',pieMergeSmallThreshold:0};
 const table={headers:['项目','数值A','数值B','规模'],rows:[['A','10','20','9'],['B','-4','18','16']]};
 
 describe('professional charts',()=>{
