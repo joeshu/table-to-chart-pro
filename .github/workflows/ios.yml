@@ -32,8 +32,13 @@ jobs:
       - name: Install Tauri CLI
         run: cargo install tauri-cli --version '^2' --locked
       - name: Initialize iOS project
-        run: cargo tauri ios init --ci
+        run: |
+          cargo tauri ios init --ci
+          sed -i '' 's/CODE_SIGN_STYLE = Automatic;/CODE_SIGNING_ALLOWED = NO; CODE_SIGNING_REQUIRED = NO; CODE_SIGN_STYLE = Manual;/g' src-tauri/gen/apple/*.xcodeproj/project.pbxproj
       - name: Build unsigned iOS app
+        env:
+          CODE_SIGNING_ALLOWED: "NO"
+          CODE_SIGNING_REQUIRED: "NO"
         run: cargo tauri ios build --ci --target aarch64
       - name: Package unsigned IPA
         shell: bash
