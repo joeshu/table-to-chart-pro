@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "node scripts/sync-version.mjs && vite build",
     "typecheck": "vue-tsc --noEmit",
-    "test": "vitest run",
+    "test": "vitest run tests",
     "test:e2e": "playwright test",
     "lint": "eslint .",
     "format:check": "prettier --check .prettierrc.json",
