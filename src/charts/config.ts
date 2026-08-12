@@ -66,7 +66,7 @@ export function buildChartConfig(table: DataTable, settings: ChartSettings) {
     const scales:any=axes(palette,settings,formatter);scales.y1={position:'right',beginAtZero:true,grid:{display:false},ticks:{color:palette.text,callback:(value:any)=>formatter(Number(value))}};
     return {type:'bar',data:{labels,datasets},options:{...common,scales},plugins:[dataLabelPlugin]};
   }
-  const type=(settings.type==='heatmap'||settings.type==='funnel'?'bar':settings.type==='area'?'line':settings.type) as ChartType;
+  const type=(settings.type==='area'?'line':settings.type) as ChartType;
   const forceArea=settings.type==='area',rawSeries=table.headers.slice(1).map((_,index)=>numeric(index+1)),totals=table.rows.map((_,rowIndex)=>rawSeries.reduce((sum,series)=>sum+Math.max(0,series[rowIndex]),0));
   const datasets=table.headers.slice(1).map((header,index)=>({label:header,data:settings.percentageStacked?rawSeries[index].map((value,rowIndex)=>totals[rowIndex]?value/totals[rowIndex]*100:0):(type==='line'?numericNullable(index+1):rawSeries[index]),backgroundColor:type==='line'||type==='radar'?(forceArea||settings.areaFill||type==='radar'?palette.colors[index%palette.colors.length]+'33':'transparent'):palette.colors[index%palette.colors.length],borderColor:palette.colors[index%palette.colors.length],borderWidth:2,borderRadius:type==='bar'?5:0,tension:settings.smooth?.36:0,fill:type==='radar'||forceArea||(type==='line'&&settings.areaFill),spanGaps:settings.connectGaps,stack:settings.stacked?'main':undefined,pointRadius:type==='line'?3:undefined}));
   const options=type==='radar'?{...common,scales:{r:{grid:{display:settings.showGrid,color:palette.grid},pointLabels:{color:palette.text},ticks:{display:false}}}}:{...common,scales:axes(palette,settings,formatter)};
