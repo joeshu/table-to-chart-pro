@@ -1,0 +1,9 @@
+dist
+node_modules
+src-tauri/target
+src-tauri/gen
+public/vendor
+package-lock.json
+src-tauri/Cargo.lock
+TASK_PLAN.md
+PRODUCT_AUDIT.md

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseProject } from '../src/platform/native';
+import { migrateProject, parseProject } from '../src/platform/native';
 
 const valid = {
   schemaVersion: 1 as const,
@@ -15,6 +15,12 @@ describe('project file contract', () => {
     expect(parseProject(JSON.stringify(valid)).metadata.name).toBe('测试项目');
   });
   it('rejects unsupported or damaged projects', () => {
-    expect(() => parseProject('{"schemaVersion":2}')).toThrow(/不受支持|损坏/);
+    expect(() => parseProject('{"schemaVersion":2}')).toThrow(/不受支持|不支持|损坏/);
+  });
+  it('migrates legacy projects without a schema version', () => {
+    const legacy = { metadata: { name: '旧项目' }, data: valid.data, chart: { ...valid.chart, customColors: undefined } };
+    const migrated = migrateProject(legacy);
+    expect(migrated.schemaVersion).toBe(1);
+    expect(migrated.chart.customColors).toEqual([]);
   });
 });

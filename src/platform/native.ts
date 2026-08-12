@@ -82,10 +82,18 @@ export async function loadDraft():Promise<ProjectDocument|null>{
   if(!contents)return null;try{return parseProject(contents);}catch{return null;}
 }
 
+export function migrateProject(value:unknown):ProjectDocument{
+  if(!value||typeof value!=='object')throw new Error('项目文件格式不受支持或已损坏');
+  const source=value as Record<string,any>;
+  if(source.schemaVersion===1)return source as ProjectDocument;
+  if(source.schemaVersion===undefined&&source.data?.headers&&source.data?.rows&&source.chart){
+    return {schemaVersion:1,metadata:{name:source.metadata?.name??'迁移项目',updatedAt:source.metadata?.updatedAt??new Date().toISOString()},data:source.data,chart:{...source.chart,customColors:source.chart.customColors??[]}} as ProjectDocument;
+  }
+  throw new Error(`不支持的项目版本：${String(source.schemaVersion??'未知')}`);
+}
+
 export function parseProject(contents:string):ProjectDocument{
-  const value=JSON.parse(contents) as Partial<ProjectDocument>;
-  if(value.schemaVersion!==1||!value.data?.headers||!value.data?.rows||!value.chart)throw new Error('项目文件格式不受支持或已损坏');
-  return value as ProjectDocument;
+  return migrateProject(JSON.parse(contents));
 }
 
 function openProjectInBrowser():Promise<OpenedProject|null>{return new Promise(resolve=>{const input=document.createElement('input');input.type='file';input.accept='.t2c,.json';input.onchange=async()=>{const file=input.files?.[0];if(!file)return resolve(null);resolve({path:null,document:parseProject(await file.text())});};input.click();});}
