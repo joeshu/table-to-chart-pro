@@ -8,6 +8,7 @@ const selected = ref(new Set<number>());
 const errors = computed(() => props.issues.filter(issue => issue.level === 'error'));
 function toggle(index: number, checked: boolean) { const next = new Set(selected.value); checked ? next.add(index) : next.delete(index); selected.value = next; }
 function remove() { emit('deleteRows', [...selected.value]); selected.value = new Set(); }
+function parseAndShowTable() { emit('parse'); mode.value = 'table'; }
 </script>
 
 <template>
@@ -16,7 +17,7 @@ function remove() { emit('deleteRows', [...selected.value]); selected.value = ne
     <div v-if="errors.length" class="quality-strip"><strong>{{ errors.length }} 个数据错误</strong><span>{{ errors[0].message }}</span></div>
     <div v-if="mode === 'paste'" class="paste-view">
       <textarea :value="raw" @input="emit('update:raw', ($event.target as HTMLTextAreaElement).value)" placeholder="从 Excel、WPS 或 Numbers 粘贴数据"></textarea>
-      <button class="primary-command full" @click="emit('parse')">识别并更新</button>
+      <button class="primary-command full" @click="parseAndShowTable">识别并更新</button>
     </div>
     <template v-else>
       <div class="table-tools"><button class="import-button" @click="emit('import')">导入文件</button><button @click="emit('addRow')">＋ 行</button><button @click="emit('addColumn')">＋ 列</button><button class="danger-text" :disabled="!selected.size" @click="remove">删除 {{ selected.size || '' }}</button></div>
