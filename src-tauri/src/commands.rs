@@ -1,5 +1,6 @@
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use calamine::{open_workbook_auto, Data, Reader};
+use encoding_rs::Encoding;
 use serde::Serialize;
 use std::{fs, path::{Path, PathBuf}};
 
@@ -30,9 +31,9 @@ fn is_supported_file(path: &str) -> bool {
 }
 
 #[tauri::command]
-pub fn import_spreadsheet(path: String) -> Result<Vec<ImportedSheet>, String> {
+pub fn import_spreadsheet(path: String, encoding: Option<String>) -> Result<Vec<ImportedSheet>, String> {
     let file=Path::new(&path); let ext=file.extension().and_then(|v|v.to_str()).unwrap_or("").to_lowercase();
-    match ext.as_str() { "xlsx"|"xls"|"xlsb"|"ods" => import_excel(file), "csv"|"tsv"|"txt" => import_delimited(file,&ext), _ => Err("不支持的表格文件格式".into()) }
+    match ext.as_str() { "xlsx"|"xls"|"xlsb"|"ods" => import_excel(file), "csv"|"tsv"|"txt" => import_delimited(file,&ext,encoding.as_deref()), _ => Err("不支持的表格文件格式".into()) }
 }
 
 fn import_excel(path:&Path)->Result<Vec<ImportedSheet>,String>{
@@ -41,9 +42,9 @@ fn import_excel(path:&Path)->Result<Vec<ImportedSheet>,String>{
     if sheets.is_empty(){Err("工作簿中没有可导入的数据".into())}else{Ok(sheets)}
 }
 
-fn import_delimited(path:&Path,ext:&str)->Result<Vec<ImportedSheet>,String>{
-    let bytes=fs::read(path).map_err(|e|e.to_string())?; let delimiter=if ext=="tsv"{b'\t'}else{detect_delimiter(&bytes)};
-    let mut reader=csv::ReaderBuilder::new().delimiter(delimiter).has_headers(false).flexible(true).from_reader(bytes.as_slice()); let mut matrix=Vec::new();
+fn import_delimited(path:&Path,ext:&str,encoding:Option<&str>)->Result<Vec<ImportedSheet>,String>{
+    let bytes=fs::read(path).map_err(|e|e.to_string())?;let label=encoding.unwrap_or("utf-8");let codec=Encoding::for_label(label.as_bytes()).ok_or_else(||format!("不支持的文本编码：{label}"))?;let (decoded,_,had_errors)=codec.decode(&bytes);if had_errors{return Err(format!("无法按 {label} 解码文件，请尝试 UTF-8、GBK 或 GB18030"));}let text=decoded.into_owned();let delimiter=if ext=="tsv"{b'\t'}else{detect_delimiter(text.as_bytes())};
+    let mut reader=csv::ReaderBuilder::new().delimiter(delimiter).has_headers(false).flexible(true).from_reader(text.as_bytes());let mut matrix=Vec::new();
     for record in reader.records(){matrix.push(record.map_err(|e|e.to_string())?.iter().map(str::to_owned).collect());}
     matrix_to_sheet("数据".into(),matrix).map(|sheet|vec![sheet]).ok_or_else(||"文件中没有可导入的数据".into())
 }

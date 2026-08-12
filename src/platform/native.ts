@@ -23,12 +23,12 @@ export async function openProject(): Promise<OpenedProject | null> {
   return { path, document: parseProject(contents) };
 }
 
-export async function importWorkbook(pathOverride?: string): Promise<ImportedWorkbook | null> {
-  if (!isTauri()) return importWorkbookInBrowser();
+export async function importWorkbook(pathOverride?: string, encoding = 'utf-8'): Promise<ImportedWorkbook | null> {
+  if (!isTauri()) return importWorkbookInBrowser(encoding);
   const [{ open }, { invoke }] = await Promise.all([import('@tauri-apps/plugin-dialog'), import('@tauri-apps/api/core')]);
   const selected = pathOverride || await open({ multiple:false, directory:false, filters:[{name:'表格文件',extensions:['xlsx','xls','xlsb','ods','csv','tsv','txt']}] });
   if (!selected || Array.isArray(selected)) return null;
-  const sheets = await invoke<ImportedSheet[]>('import_spreadsheet',{path:selected});
+  const sheets = await invoke<ImportedSheet[]>('import_spreadsheet',{path:selected,encoding});
   return { path:selected, name:selected.split(/[\\/]/).pop() || '导入表格', sheets };
 }
 
@@ -92,9 +92,9 @@ export async function loadDraft():Promise<ProjectDocument|null>{
 export function migrateProject(value:unknown):ProjectDocument{
   if(!value||typeof value!=='object')throw new Error('项目文件格式不受支持或已损坏');
   const source=value as Record<string,any>;
-  if(source.schemaVersion===1)return source as ProjectDocument;
+  if(source.schemaVersion===1)return {...source,chart:{...source.chart,pieCenterText:source.chart?.pieCenterText??'',pieMergeSmallThreshold:source.chart?.pieMergeSmallThreshold??0}} as ProjectDocument;
   if(source.schemaVersion===undefined&&source.data?.headers&&source.data?.rows&&source.chart){
-    return {schemaVersion:1,metadata:{name:source.metadata?.name??'迁移项目',updatedAt:source.metadata?.updatedAt??new Date().toISOString()},data:source.data,chart:{...source.chart,customColors:source.chart.customColors??[]}} as ProjectDocument;
+    return {schemaVersion:1,metadata:{name:source.metadata?.name??'迁移项目',updatedAt:source.metadata?.updatedAt??new Date().toISOString()},data:source.data,chart:{...source.chart,customColors:source.chart.customColors??[],pieCenterText:source.chart.pieCenterText??'',pieMergeSmallThreshold:source.chart.pieMergeSmallThreshold??0}} as ProjectDocument;
   }
   throw new Error(`不支持的项目版本：${String(source.schemaVersion??'未知')}`);
 }
@@ -104,5 +104,10 @@ export function parseProject(contents:string):ProjectDocument{
 }
 
 function openProjectInBrowser():Promise<OpenedProject|null>{return new Promise(resolve=>{const input=document.createElement('input');input.type='file';input.accept='.t2c,.json';input.onchange=async()=>{const file=input.files?.[0];if(!file)return resolve(null);resolve({path:null,document:parseProject(await file.text())});};input.click();});}
-function importWorkbookInBrowser():Promise<ImportedWorkbook|null>{return new Promise(resolve=>{const input=document.createElement('input');input.type='file';input.accept='.csv,.tsv,.txt';input.onchange=async()=>{const file=input.files?.[0];if(!file)return resolve(null);const {parseTable}=await import('../data/parser');const table=parseTable(await file.text());resolve({path:null,name:file.name,sheets:[{name:'数据',...table}]});};input.click();});}
+function importWorkbookInBrowser(encoding:string):Promise<ImportedWorkbook|null>{return new Promise(resolve=>{const input=document.createElement('input');input.type='file';input.accept='.csv,.tsv,.txt';input.onchange=async()=>{const file=input.files?.[0];if(!file)return resolve(null);const {parseTable}=await import('../data/parser');const text=new TextDecoder(encoding).decode(await file.arrayBuffer());const table=parseTable(text);resolve({path:null,name:file.name,sheets:[{name:'数据',...table}]});};input.click();});}
 function downloadBlob(contents:string,name:string,type:string){const link=document.createElement('a');link.href=URL.createObjectURL(new Blob([contents],{type}));link.download=name;link.click();setTimeout(()=>URL.revokeObjectURL(link.href),1000);}
+
+export async function saveBatchFiles(files:{name:string;contents:string}[],extension:'png'|'pdf'):Promise<boolean>{
+  if(!files.length)return false;if(!isTauri()){for(const file of files){const link=document.createElement('a');link.download=file.name;link.href=file.contents;link.click();await new Promise(resolve=>setTimeout(resolve,80));}return true;}
+  const [{open},{invoke}]=await Promise.all([import('@tauri-apps/plugin-dialog'),import('@tauri-apps/api/core')]);const directory=await open({directory:true,multiple:false,title:'选择批量导出目录'});if(!directory||Array.isArray(directory))return false;const separator=directory.includes('\\')?'\\':'/';for(const file of files){const path=`${directory}${separator}${file.name}`;await invoke('write_base64_file',{path,contents:file.contents});}return true;
+}

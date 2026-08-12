@@ -3342,6 +3342,7 @@ dependencies = [
  "base64 0.22.1",
  "calamine",
  "csv",
+ "encoding_rs",
  "serde",
  "serde_json",
  "tauri",

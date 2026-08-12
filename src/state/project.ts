@@ -40,6 +40,8 @@ export interface ChartSettings {
   pieCutout: number;
   pieRotation: number;
   showTrendline: boolean;
+  pieCenterText: string;
+  pieMergeSmallThreshold: number;
 }
 
 const emptyTable = (): DataTable => ({ headers: ['项目', '数值'], rows: [['示例 A', '120'], ['示例 B', '180'], ['示例 C', '150']] });
@@ -54,7 +56,7 @@ export function useProjectState() {
     numberFormat: 'number', decimals: 0, horizontal: false, stacked: false,
     smooth: true, areaFill: false, customColors: [], yMin: null, yMax: null, yStep: null,
     valuePrefix: '', valueSuffix: '', percentageStacked: false, connectGaps: false,
-    pieCutout: 55, pieRotation: 0, showTrendline: false,
+    pieCutout: 55, pieRotation: 0, showTrendline: false, pieCenterText: '', pieMergeSmallThreshold: 0,
   });
   const appTheme = ref<AppTheme>((localStorage.getItem('app-theme') as AppTheme) || 'system');
   const zoom = ref(100);
