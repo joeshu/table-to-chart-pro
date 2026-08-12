@@ -4,5 +4,12 @@
   "printWidth": 140,
   "tabWidth": 2,
   "trailingComma": "all",
-  "overrides": [{ "files": "*.vue", "options": { "printWidth": 180 } }]
+  "overrides": [
+    {
+      "files": "*.vue",
+      "options": {
+        "printWidth": 180
+      }
+    }
+  ]
 }
