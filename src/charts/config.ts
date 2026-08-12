@@ -60,11 +60,30 @@ export function buildChartConfig(table: DataTable, settings: ChartSettings) {
   }
   if(settings.type==='heatmap'){
     const matrix=table.rows.flatMap((row,rowIndex)=>row.slice(1).map((value,colIndex)=>({x:colIndex,y:rowIndex,v:parseNumericValue(value).value??0}))),values=matrix.map(item=>item.v),min=Math.min(...values),max=Math.max(...values);
-    return {type:'scatter',data:{datasets:[{label:'热力值',data:matrix,parsing:{xAxisKey:'x',yAxisKey:'y'},pointStyle:'rectRounded',pointRadius:18,pointHoverRadius:20,backgroundColor:matrix.map(item=>heatColor(item.v,min,max,palette.colors[0]))}]},options:{...common,plugins:{...common.plugins,legend:{display:false},tooltip:{callbacks:{label:(context:any)=>`${table.rows[context.raw.y][0]} / ${table.headers[context.raw.x+1]}: ${formatter(context.raw.v)}`}}},scales:{x:{min:-.5,max:table.headers.length-1.5,ticks:{stepSize:1,color:palette.text,callback:(value:any)=>table.headers[Number(value)+1]??''},grid:{display:false}},y:{min:-.5,max:table.rows.length-.5,reverse:true,ticks:{stepSize:1,color:palette.text,callback:(value:any)=>table.rows[Number(value)]?.[0]??''},grid:{display:false}}},workspaceInsights:{heatLegend:{min,max,color:palette.colors[0],formatter},color:palette.text}}},plugins:[dataLabelPlugin,insightPlugin]};
+    return {
+      type:'scatter',
+      data:{datasets:[{label:'热力值',data:matrix,parsing:{xAxisKey:'x',yAxisKey:'y'},pointStyle:'rectRounded',pointRadius:18,pointHoverRadius:20,backgroundColor:matrix.map(item=>heatColor(item.v,min,max,palette.colors[0]))}]},
+      options:{
+        ...common,
+        plugins:{...common.plugins,legend:{display:false},tooltip:{callbacks:{label:(context:any)=>`${table.rows[context.raw.y][0]} / ${table.headers[context.raw.x+1]}: ${formatter(context.raw.v)}`}},workspaceInsights:{heatLegend:{min,max,color:palette.colors[0],formatter},color:palette.text}},
+        scales:{x:{min:-.5,max:table.headers.length-1.5,ticks:{stepSize:1,color:palette.text,callback:(value:any)=>table.headers[Number(value)+1]??''},grid:{display:false}},y:{min:-.5,max:table.rows.length-.5,reverse:true,ticks:{stepSize:1,color:palette.text,callback:(value:any)=>table.rows[Number(value)]?.[0]??''},grid:{display:false}}}
+      },
+      plugins:[dataLabelPlugin,insightPlugin]
+    };
   }
   if(settings.type==='funnel'){
     const values=numeric(1),first=values[0]??0;
-    return {type:'bar',data:{labels,datasets:[{label:table.headers[1],data:values,backgroundColor:values.map((_,index)=>palette.colors[index%palette.colors.length]),borderRadius:6}]},options:{...common,indexAxis:'y',plugins:{...common.plugins,legend:{display:false},tooltip:{callbacks:{label:(context:any)=>`${formatter(context.raw)}${first?`，占首环节 ${(context.raw/first*100).toFixed(1)}%`:''}`}}},workspaceInsights:{funnelValues:values,color:palette.text}},scales:{x:{beginAtZero:true,grid:{display:settings.showGrid,color:palette.grid},ticks:{color:palette.text,callback:(value:any)=>formatter(Number(value))}},y:{grid:{display:false},ticks:{color:palette.text}}}},plugins:[dataLabelPlugin,insightPlugin]};
+    return {
+      type:'bar',
+      data:{labels,datasets:[{label:table.headers[1],data:values,backgroundColor:values.map((_,index)=>palette.colors[index%palette.colors.length]),borderRadius:6}]},
+      options:{
+        ...common,
+        indexAxis:'y',
+        plugins:{...common.plugins,legend:{display:false},tooltip:{callbacks:{label:(context:any)=>`${formatter(context.raw)}${first?`，占首环节 ${(context.raw/first*100).toFixed(1)}%`:''}`}},workspaceInsights:{funnelValues:values,color:palette.text}},
+        scales:{x:{beginAtZero:true,grid:{display:settings.showGrid,color:palette.grid},ticks:{color:palette.text,callback:(value:any)=>formatter(Number(value))}},y:{grid:{display:false},ticks:{color:palette.text}}}
+      },
+      plugins:[dataLabelPlugin,insightPlugin]
+    };
   }
   if(settings.type==='combo'){
     const datasets=table.headers.slice(1).map((header,index)=>index===0?{type:'bar',label:header,data:numeric(index+1),backgroundColor:palette.colors[0],borderRadius:5,yAxisID:'y'}:{type:'line',label:header,data:numeric(index+1),borderColor:palette.colors[index%palette.colors.length],backgroundColor:palette.colors[index%palette.colors.length]+'22',tension:.34,pointRadius:4,yAxisID:'y1'});
