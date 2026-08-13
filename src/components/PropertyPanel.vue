@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import {computed,ref} from 'vue';
-import type {ChartSettings,NumberFormat,ThemeName} from '../state/project';
-import type {ChartType} from '../charts/config';
+import type {ChartSettings,ChartType,NumberFormat,ThemeName} from '../state/project';
 import {palettes} from '../charts/config';
 import SeriesEditor from './SeriesEditor.vue';
 import AxisStyleEditor from './AxisStyleEditor.vue';
@@ -29,7 +28,7 @@ function importBrand(){const input=document.createElement('input');input.type='f
   <nav class="property-tabs" aria-label="属性分类">
     <button :class="{active:tab==='chart'}" @click="tab='chart'"><b>▦</b><span>图表</span></button>
     <button :class="{active:tab==='series'}" @click="tab='series'"><b>≡</b><span>系列</span></button>
-    <button :class="{active:tab==='axes'}" @click="tab='axes'"><b>⌗</b><span>坐标轴</span></button>
+    <button :class="{active:tab==='axis'}" @click="tab='axis'"><b>⌗</b><span>坐标轴</span></button>
     <button :class="{active:tab==='appearance'}" @click="tab='appearance'"><b>◐</b><span>外观</span></button>
   </nav>
   <div class="property-content">
