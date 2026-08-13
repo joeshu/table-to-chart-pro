@@ -70,7 +70,7 @@ export async function copyText(text:string):Promise<void>{
 export async function copySvg(svg:string):Promise<void>{
   if(navigator.clipboard?.write&&typeof ClipboardItem!=='undefined'){
     const item=new ClipboardItem({'image/svg+xml':new Blob([svg],{type:'image/svg+xml'}),'text/plain':new Blob([svg],{type:'text/plain'})});
-    try{await navigator.clipboard.write([item]);return;}catch{}
+    try{await navigator.clipboard.write([item]);return;}catch(error){void error;/* Fall back to plain text for browsers without rich clipboard permission. */}
   }
   await copyText(svg);
 }
