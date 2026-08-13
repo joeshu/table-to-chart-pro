@@ -19,7 +19,7 @@ export const exportPresets=[
 export async function renderChartImage(table:DataTable,settings:ChartSettings,options:ExportOptions):Promise<string>{
   const canvas=document.createElement('canvas');canvas.width=options.width;canvas.height=options.height;canvas.style.width=`${options.width}px`;canvas.style.height=`${options.height}px`;
   const ctx=canvas.getContext('2d');if(!ctx)throw new Error('无法创建导出画布');
-  const palette=palettes[settings.theme],background=options.background==='transparent'?null:(options.background==='white'?'#ffffff':palette.background);
+  const palette=palettes[settings.theme],themeBackground=settings.background||palette.background,background=options.background==='transparent'?null:(options.background==='white'?'#ffffff':themeBackground);
   const config:any=buildChartConfig(table,{...settings,animate:false});config.options.responsive=false;config.options.maintainAspectRatio=false;config.options.animation=false;config.options.devicePixelRatio=options.scale;config.options.plugins.title.padding={top:28,bottom:settings.subtitle?4:16};
   config.plugins=[...(config.plugins??[]),{id:'exportSurface',beforeDraw(chart:any){if(background){const c=chart.ctx;c.save();c.globalCompositeOperation='destination-over';c.fillStyle=background;c.fillRect(0,0,chart.width,chart.height);c.restore();}},afterDraw(chart:any){if(settings.source){const c=chart.ctx;c.save();c.font='12px sans-serif';c.fillStyle=palette.text;c.globalAlpha=.62;c.textAlign='left';c.fillText(`数据来源：${settings.source}`,24,chart.height-16);c.restore();}}}];
   const chart=new Chart(ctx,config);await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));

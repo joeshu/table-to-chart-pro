@@ -35,4 +35,9 @@ test('paste data, render chart and open export dialog', async ({ page }) => {
   await page.getByRole('button', { name: '导出' }).click();
   await expect(page.getByRole('heading', { name: '导出图表' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'PPT 16:9' })).toBeVisible();
+  await page.getByRole('button', { name: '锁定' }).click();
+  const dimensions=page.locator('.dimension-row input');
+  await dimensions.nth(0).fill('8000');await dimensions.nth(1).fill('8000');
+  await expect(page.getByText(/4000 万以内/)).toBeVisible();
+  await expect(page.getByRole('button', { name: '开始导出' })).toBeDisabled();
 });
