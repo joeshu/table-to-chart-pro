@@ -11,7 +11,14 @@ import {deleteUserTemplate,loadUserTemplates,saveUserTemplate} from './templates
 const appVersion=__APP_VERSION__;
 const state=useProjectState(),chart=ref<InstanceType<typeof ChartCanvas>>(),currentPath=ref<string|null>(null),projectName=ref('未命名项目'),notice=ref('');
 const importSheets=ref<ImportedSheet[]>([]),importName=ref(''),importing=ref(false),userTemplates=ref(loadUserTemplates()),recentProjects=ref<string[]>([]),showRecent=ref(false),showExport=ref(false),showTemplates=ref(false),showAbout=ref(false),showProperties=ref(false),mobileTab=ref<'data'|'chart'|'style'>('chart');let importRequestId=0;let draftTimer:number|undefined;const unlisteners:(()=>void)[]=[];
-const chartError=computed(()=>{const minimum:{[key:string]:number}={combo:2,scatter:2,bubble:3,heatmap:2};const required=minimum[state.settings.type]??1;if(state.table.value.headers.length-1<required)return `当前图表至少需要 ${required} 个数值列`;if(['pie','doughnut','funnel'].includes(state.settings.type)&&state.table.value.rows.some(row=>(parseNumericValue(row[1]).value??0)<0))return '饼图、环形图和漏斗图不支持负值';return '';});
+const chartError=computed(()=>{
+  const minimum:{[key:string]:number}={combo:2,scatter:2,bubble:3,heatmap:2},required=minimum[state.settings.type]??1;
+  if(state.table.value.headers.length-1<required)return `当前图表至少需要 ${required} 个数值列`;
+  if(['pie','doughnut','funnel'].includes(state.settings.type)&&state.table.value.rows.some(row=>(parseNumericValue(row[1]).value??0)<0))return '饼图、环形图和漏斗图不支持负值';
+  const columns=state.table.value.headers.slice(1).map((_,index)=>index+1).filter(column=>!state.settings.hiddenColumns.includes(column)),hasNonPositive=(items:number[])=>state.table.value.rows.some(row=>items.some(column=>{const value=parseNumericValue(row[column]).value;return value!==null&&value<=0;}));
+  if(state.settings.type==='combo'){const right=new Set(state.settings.comboRightAxisColumns??columns.filter(column=>!state.settings.comboBarColumns.includes(column))),left=columns.filter(column=>!right.has(column));if(state.settings.yScaleType==='logarithmic'&&hasNonPositive(left))return '左侧对数轴要求所有数值大于 0';if(state.settings.y2ScaleType==='logarithmic'&&hasNonPositive([...right]))return '右侧对数轴要求所有数值大于 0';}
+  else if(state.settings.yScaleType==='logarithmic'&&hasNonPositive(columns))return '对数轴要求所有数值大于 0';return '';
+});
 const errorCount=computed(()=>state.issues.value.filter(i=>i.level==='error').length);
 const workspaceError=computed(()=>state.hasErrors.value?'请先修复数据面板中的错误':chartError.value);
 const fileLabel=computed(()=>currentPath.value?.split(/[\\/]/).pop()||projectName.value);
