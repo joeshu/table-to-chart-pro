@@ -42,10 +42,18 @@ export interface ChartSettings {
   showTrendline: boolean;
   pieCenterText: string;
   pieMergeSmallThreshold: number;
+  comboBarColumns: number[];
+  rightAxisTitle: string;
+  rightAxisFormat: NumberFormat | 'auto';
+  y2Min: number | null;
+  y2Max: number | null;
+  y2Step: number | null;
+  yBeginAtZero: boolean;
+  y2BeginAtZero: boolean;
 }
 
 export function createDefaultChartSettings():ChartSettings{return {
-  type:'bar',theme:'business',title:'数据可视化',subtitle:'',source:'',xAxisTitle:'',yAxisTitle:'',legendPosition:'top',showLegend:true,showDataLabels:false,showGrid:true,animate:true,background:'',numberFormat:'number',decimals:0,horizontal:false,stacked:false,smooth:true,areaFill:false,customColors:[],yMin:null,yMax:null,yStep:null,valuePrefix:'',valueSuffix:'',percentageStacked:false,connectGaps:false,pieCutout:55,pieRotation:0,showTrendline:false,pieCenterText:'',pieMergeSmallThreshold:0,
+  type:'bar',theme:'business',title:'数据可视化',subtitle:'',source:'',xAxisTitle:'',yAxisTitle:'',legendPosition:'top',showLegend:true,showDataLabels:false,showGrid:true,animate:true,background:'',numberFormat:'number',decimals:0,horizontal:false,stacked:false,smooth:true,areaFill:false,customColors:[],yMin:null,yMax:null,yStep:null,valuePrefix:'',valueSuffix:'',percentageStacked:false,connectGaps:false,pieCutout:55,pieRotation:0,showTrendline:false,pieCenterText:'',pieMergeSmallThreshold:0,comboBarColumns:[1],rightAxisTitle:'',rightAxisFormat:'auto',y2Min:null,y2Max:null,y2Step:null,yBeginAtZero:true,y2BeginAtZero:true,
 };}
 
 const emptyTable = (): DataTable => ({ headers: ['项目', '数值'], rows: [['示例 A', '120'], ['示例 B', '180'], ['示例 C', '150']] });

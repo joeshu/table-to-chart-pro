@@ -101,6 +101,7 @@ onUnmounted(()=>{window.removeEventListener('keydown',keydown);window.removeEven
         :class="{ 'mobile-hidden': mobileTab !== 'style', 'drawer-open': showProperties }"
         :settings="state.settings"
         :numeric-columns="state.table.value.headers.length - 1"
+        :headers="state.table.value.headers"
         @change="changeSettings"
       />
     </div>
