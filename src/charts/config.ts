@@ -28,7 +28,7 @@ export const dataLabelPlugin = {
       const meta=chart.getDatasetMeta(index); if(meta.hidden)return;
       meta.data.forEach((element:any,dataIndex:number)=>{
         const raw=dataset.data[dataIndex]; const value=Array.isArray(raw)?raw[1]-raw[0]:typeof raw==='object'?(raw.v??raw.y??raw.x):raw;
-        if(typeof value!=='number')return; const point=element.tooltipPosition(); ctx.fillText(options.formatter(value),point.x,point.y-5);
+        if(typeof value!=='number')return; const point=element.tooltipPosition(); const formatter=dataset.valueFormatter??options.formatter; ctx.fillText(formatter(value),point.x,point.y-5);
       });
     }); ctx.restore();
   },
@@ -40,8 +40,10 @@ export function buildChartConfig(table: DataTable, settings: ChartSettings) {
   const basePalette=palettes[settings.theme], customColors=settings.customColors??[], palette={...basePalette,background:settings.background||basePalette.background,colors:customColors.length?customColors:basePalette.colors}, labels=table.rows.map(row=>row[0]);
   const numeric=(col:number)=>table.rows.map(row=>parseNumericValue(row[col]).value??0);
   const numericNullable=(col:number)=>table.rows.map(row=>parseNumericValue(row[col]).value);
+  const isPercentColumn=(col:number)=>table.rows.some(row=>String(row[col]??'').trim().endsWith('%'));
+  const columnFormatter=(col:number)=>(value:number)=>isPercentColumn(col)?`${settings.valuePrefix??''}${(value*100).toFixed(Math.max(1,settings.decimals))}%${settings.valueSuffix??''}`:formatter(value);
   const formatter=(value:number)=>`${settings.valuePrefix??''}${formatChartValue(value,settings.numberFormat,settings.decimals)}${settings.valueSuffix??''}`;
-  const tooltip={callbacks:{label:(context:any)=>`${context.dataset.label?`${context.dataset.label}: `:''}${formatter(Number(context.raw?.y??context.raw))}`}};
+  const tooltip={callbacks:{label:(context:any)=>`${context.dataset.label?`${context.dataset.label}: `:''}${(context.dataset.valueFormatter??formatter)(Number(context.raw?.y??context.raw))}`}};
   const common:any={responsive:true,maintainAspectRatio:false,indexAxis:settings.type==='bar'&&settings.horizontal?'y':'x',animation:settings.animate?{duration:450}:false,plugins:{legend:{display:settings.showLegend,position:settings.legendPosition,labels:{color:palette.text,usePointStyle:true,padding:18}},title:{display:Boolean(settings.title),text:settings.title,color:palette.text,font:{size:18,weight:'600'},padding:{bottom:settings.subtitle?4:16}},subtitle:{display:Boolean(settings.subtitle),text:settings.subtitle,color:palette.text,font:{size:12,weight:'normal'},padding:{bottom:16}},tooltip,workspaceDataLabels:{enabled:settings.showDataLabels,color:palette.text,formatter}}};
   if(settings.type==='pie'||settings.type==='doughnut'){
     const sourceValues=numeric(1),total=sourceValues.reduce((sum,value)=>sum+Math.max(0,value),0),threshold=settings.pieMergeSmallThreshold??0,keptLabels:string[]=[],keptValues:number[]=[],smallIndexes:number[]=[];sourceValues.forEach((value,index)=>{if(threshold>0&&total>0&&value/total*100<threshold)smallIndexes.push(index);else{keptLabels.push(labels[index]);keptValues.push(value);}});if(smallIndexes.length){keptLabels.push('其他');keptValues.push(smallIndexes.reduce((sum,index)=>sum+sourceValues[index],0));}
@@ -86,8 +88,8 @@ export function buildChartConfig(table: DataTable, settings: ChartSettings) {
     };
   }
   if(settings.type==='combo'){
-    const datasets=table.headers.slice(1).map((header,index)=>index===0?{type:'bar',label:header,data:numeric(index+1),backgroundColor:palette.colors[0],borderRadius:5,yAxisID:'y'}:{type:'line',label:header,data:numeric(index+1),borderColor:palette.colors[index%palette.colors.length],backgroundColor:palette.colors[index%palette.colors.length]+'22',tension:.34,pointRadius:4,yAxisID:'y1'});
-    const scales:any=axes(palette,settings,formatter);scales.y1={position:'right',beginAtZero:true,grid:{display:false},ticks:{color:palette.text,callback:(value:any)=>formatter(Number(value))}};
+    const datasets=table.headers.slice(1).map((header,index)=>({type:index===0?'bar':'line',label:header,data:numeric(index+1),valueFormatter:columnFormatter(index+1),backgroundColor:index===0?palette.colors[0]:palette.colors[index%palette.colors.length]+'22',borderColor:palette.colors[index%palette.colors.length],borderRadius:index===0?5:0,tension:index===0?0:.34,pointRadius:index===0?0:4,yAxisID:index===0?'y':'y1'}));
+    const scales:any=axes(palette,settings,formatter);scales.y1={position:'right',beginAtZero:true,grid:{display:false},ticks:{color:palette.text,callback:(value:any)=>columnFormatter(2)(Number(value))}};
     return {type:'bar',data:{labels,datasets},options:{...common,scales},plugins:[dataLabelPlugin]};
   }
   const type=(settings.type==='area'?'line':settings.type) as ChartType;
