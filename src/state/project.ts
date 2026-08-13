@@ -114,8 +114,7 @@ export interface ChartSettings {
   plotMarginRight?: number;
   plotMarginBottom?: number;
   plotMarginLeft?: number;
-
-export function createDefaultChartSettings():ChartSettings{return {
+}
   type:'bar',theme:'business',title:'数据可视化',subtitle:'',source:'',xAxisTitle:'',yAxisTitle:'',legendPosition:'top',showLegend:true,showDataLabels:false,showGrid:true,animate:true,background:'',numberFormat:'number',decimals:0,horizontal:false,stacked:false,smooth:true,areaFill:false,customColors:[],seriesColors:{},yMin:null,yMax:null,yStep:null,valuePrefix:'',valueSuffix:'',percentageStacked:false,connectGaps:false,pieCutout:55,pieRotation:0,showTrendline:false,pieCenterText:'',pieMergeSmallThreshold:0,comboBarColumns:[1],rightAxisTitle:'',rightAxisFormat:'auto',y2Min:null,y2Max:null,y2Step:null,yBeginAtZero:true,y2BeginAtZero:true,comboRightAxisColumns:null,hiddenColumns:[],barCategoryPercentage:.8,barPercentage:.9,barRadius:5,barBorderWidth:0,lineWidth:2,lineDash:false,pointRadius:4,xLabelRotation:0,dataLabelPosition:'auto',lineStepped:false,xMaxTicks:12,showAxisBorder:true,gridLineWidth:1,seriesNames:{},seriesOrder:[],seriesOpacity:{},seriesLineWidths:{},seriesPointRadii:{},seriesDashed:{},xAxisFontSize:11,xAxisColor:'',yAxisFontSize:11,yAxisColor:'',yAxisDecimals:null,y2AxisFontSize:11,y2AxisColor:'',y2AxisDecimals:null,titleFontSize:18,titleColor:'',titleAlign:'center',subtitleFontSize:12,subtitleColor:'',legendFontSize:11,legendPointStyle:'circle',legendReverse:false,dataLabelFontSize:10,dataLabelColor:'',dataLabelBackground:'',dataLabelBorderColor:'',plotPadding:8,plotBorderWidth:0,plotBorderColor:'',seriesPointStyles:{},seriesTrendlines:{},seriesMovingAveragePeriods:{},showTrendEquation:true,showTrendR2:true,yScaleType:'linear',y2ScaleType:'linear',yReverse:false,y2Reverse:false,dataLabelRotation:0,dataLabelOffset:0,categoryColumn:0,dataStartRow:1,dataEndRow:null,plotMarginTop:28,plotMarginRight:16,plotMarginBottom:28,plotMarginLeft:24,
 };}
 
