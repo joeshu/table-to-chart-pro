@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {computed,ref} from 'vue';
+import {computed,ref,watch} from 'vue';
 import type {ChartSettings,NumberFormat,ThemeName} from '../state/project';
 import type {ChartType} from '../types';
 import {palettes} from '../charts/config';
@@ -8,9 +8,10 @@ import AxisStyleEditor from './AxisStyleEditor.vue';
 import ChartStyleEditor from './ChartStyleEditor.vue';
 import ChartBehaviorEditor from './ChartBehaviorEditor.vue';
 import PropertyGroup from './PropertyGroup.vue';
-const props=defineProps<{settings:ChartSettings;numericColumns:number;headers:string[];columnIds?:string[]}>();
-const emit=defineEmits<{change:[Partial<ChartSettings>]}>();
+const props=defineProps<{settings:ChartSettings;numericColumns:number;headers:string[];columnIds?:string[];focus?:'chart'|'series'|'axis'|'appearance'}>();
+const emit=defineEmits<{change:[Partial<ChartSettings>];selectData:[]}>();
 const tab=ref<'chart'|'series'|'axis'|'appearance'>('chart');
+      watch(()=>props.focus,value=>{if(value)tab.value=value;},{immediate:true});
 const hasSeriesEditor=computed(()=>['bar','line','area','combo'].includes(props.settings.type));
 const chartTypes:{value:ChartType;label:string;icon:string;min?:number}[]=[
 {value:'bar',label:'柱状',icon:'▥'},{value:'line',label:'折线',icon:'⌁'},{value:'area',label:'面积',icon:'◒'},{value:'pie',label:'饼图',icon:'◔'},{value:'doughnut',label:'环形',icon:'◉'},{value:'scatter',label:'散点',icon:'⠿',min:2},{value:'bubble',label:'气泡',icon:'◌',min:3},{value:'radar',label:'雷达',icon:'◇'},{value:'combo',label:'组合',icon:'▦',min:2},{value:'waterfall',label:'瀑布',icon:'▟'},{value:'heatmap',label:'热力',icon:'▦',min:2},{value:'funnel',label:'漏斗',icon:'▽'}];
@@ -37,9 +38,7 @@ function importBrand(){const input=document.createElement('input');input.type='f
       <PropertyGroup title="图表类型" hint="选择最适合数据的图形" :open="true">
         <div class="chart-type-grid"><button v-for="item in chartTypes" :key="item.value" :class="{active:settings.type===item.value,disabled:item.min&&numericColumns<item.min}" :disabled="Boolean(item.min&&numericColumns<item.min)" :title="item.min&&numericColumns<item.min?`至少需要 ${item.min} 个数值列`:item.label" @click="chooseType(item.value)"><span>{{item.icon}}</span><small>{{item.label}}</small></button></div>
       </PropertyGroup>
-      <PropertyGroup title="标题与说明" hint="图表名称、说明和来源" :open="true">
-        <div class="field-stack"><label>主标题<input :value="settings.title" @input="emit('change',{title:($event.target as HTMLInputElement).value})"></label><label>副标题<input :value="settings.subtitle" placeholder="可选" @input="emit('change',{subtitle:($event.target as HTMLInputElement).value})"></label><label>数据来源<input :value="settings.source" placeholder="可选" @input="emit('change',{source:($event.target as HTMLInputElement).value})"></label></div>
-      </PropertyGroup>      <ChartBehaviorEditor :settings="settings" @change="emit('change',$event)"/>
+      <PropertyGroup title="选择数据" hint="分类轴、系列和数据范围" :open="true"><button class="primary-command full" @click="emit('selectData')">打开“选择数据”窗口</button></PropertyGroup><PropertyGroup title="标题与说明" hint="图表名称、说明和来源" :open="true"><div class="field-stack"><label>主标题<input :value="settings.title" @input="emit('change',{title:($event.target as HTMLInputElement).value})"></label><label>副标题<input :value="settings.subtitle" placeholder="可选" @input="emit('change',{subtitle:($event.target as HTMLInputElement).value})"></label><label>数据来源<input :value="settings.source" placeholder="可选" @input="emit('change',{source:($event.target as HTMLInputElement).value})"></label></div></PropertyGroup>      <ChartBehaviorEditor :settings="settings" @change="emit('change',$event)"/>
       <PropertyGroup title="显示内容" hint="图例、标签、网格与动画">
         <div class="setting-toggles"><label><span>显示图例</span><input type="checkbox" :checked="settings.showLegend" @change="emit('change',{showLegend:($event.target as HTMLInputElement).checked})"></label><label><span>显示数据标签</span><input type="checkbox" :checked="settings.showDataLabels" @change="emit('change',{showDataLabels:($event.target as HTMLInputElement).checked})"></label><label><span>显示网格线</span><input type="checkbox" :checked="settings.showGrid" @change="emit('change',{showGrid:($event.target as HTMLInputElement).checked})"></label><label><span>启用动画</span><input type="checkbox" :checked="settings.animate" @change="emit('change',{animate:($event.target as HTMLInputElement).checked})"></label></div>
       </PropertyGroup>
