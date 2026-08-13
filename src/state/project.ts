@@ -50,10 +50,21 @@ export interface ChartSettings {
   y2Step: number | null;
   yBeginAtZero: boolean;
   y2BeginAtZero: boolean;
+  comboRightAxisColumns: number[] | null;
+  hiddenColumns: number[];
+  barCategoryPercentage: number;
+  barPercentage: number;
+  barRadius: number;
+  barBorderWidth: number;
+  lineWidth: number;
+  lineDash: boolean;
+  pointRadius: number;
+  xLabelRotation: number;
+  dataLabelPosition: 'auto' | 'top' | 'center';
 }
 
 export function createDefaultChartSettings():ChartSettings{return {
-  type:'bar',theme:'business',title:'数据可视化',subtitle:'',source:'',xAxisTitle:'',yAxisTitle:'',legendPosition:'top',showLegend:true,showDataLabels:false,showGrid:true,animate:true,background:'',numberFormat:'number',decimals:0,horizontal:false,stacked:false,smooth:true,areaFill:false,customColors:[],yMin:null,yMax:null,yStep:null,valuePrefix:'',valueSuffix:'',percentageStacked:false,connectGaps:false,pieCutout:55,pieRotation:0,showTrendline:false,pieCenterText:'',pieMergeSmallThreshold:0,comboBarColumns:[1],rightAxisTitle:'',rightAxisFormat:'auto',y2Min:null,y2Max:null,y2Step:null,yBeginAtZero:true,y2BeginAtZero:true,
+  type:'bar',theme:'business',title:'数据可视化',subtitle:'',source:'',xAxisTitle:'',yAxisTitle:'',legendPosition:'top',showLegend:true,showDataLabels:false,showGrid:true,animate:true,background:'',numberFormat:'number',decimals:0,horizontal:false,stacked:false,smooth:true,areaFill:false,customColors:[],yMin:null,yMax:null,yStep:null,valuePrefix:'',valueSuffix:'',percentageStacked:false,connectGaps:false,pieCutout:55,pieRotation:0,showTrendline:false,pieCenterText:'',pieMergeSmallThreshold:0,comboBarColumns:[1],rightAxisTitle:'',rightAxisFormat:'auto',y2Min:null,y2Max:null,y2Step:null,yBeginAtZero:true,y2BeginAtZero:true,comboRightAxisColumns:null,hiddenColumns:[],barCategoryPercentage:.8,barPercentage:.9,barRadius:5,barBorderWidth:0,lineWidth:2,lineDash:false,pointRadius:4,xLabelRotation:0,dataLabelPosition:'auto',
 };}
 
 const emptyTable = (): DataTable => ({ headers: ['项目', '数值'], rows: [['示例 A', '120'], ['示例 B', '180'], ['示例 C', '150']] });
