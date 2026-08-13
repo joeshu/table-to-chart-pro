@@ -5,7 +5,7 @@ import { buildChartConfig, palettes } from '../charts/config';
 
 declare const Chart: new (context:CanvasRenderingContext2D,config:any)=>{destroy():void;toBase64Image(type?:string,quality?:number):string};
 
-export type ExportFormat='png'|'pdf'|'csv';
+export type ExportFormat='png'|'pdf'|'svg'|'csv';
 export interface ExportOptions { format:ExportFormat;width:number;height:number;scale:number;background:'theme'|'white'|'transparent';fileName:string;batch?:boolean; }
 export const exportPresets=[
   {id:'ppt169',label:'PPT 16:9',width:1600,height:900},
