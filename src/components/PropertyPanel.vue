@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import {computed,ref} from 'vue';
 import type {ChartSettings,NumberFormat,ThemeName} from '../state/project';
-import type {ChartType} from '../charts/types';
+import type {ChartType} from '../types';
 import {palettes} from '../charts/config';
 import SeriesEditor from './SeriesEditor.vue';
 import AxisStyleEditor from './AxisStyleEditor.vue';
