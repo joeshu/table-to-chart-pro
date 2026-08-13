@@ -1,6 +1,6 @@
 import { describe,expect,it } from 'vitest';
 import { createCsv,exportPresets } from '../src/export/exporter';
-import { buildSvgChartOption } from '../src/export/svg';
+import { buildSvgChartOption, normalizeSvgMarkup } from '../src/export/svg';
 import { createDefaultChartSettings } from '../src/state/project';
 
 describe('export service',()=>{
@@ -24,5 +24,9 @@ describe('export service',()=>{
     expect(option.series[0].name).toBe('利润率');
     expect(option.series[0].itemStyle.color).toBe('#ff0000');
     expect(option.series[0].label.show).toBe(true);
+  it('does not duplicate SVG namespace when normalizing markup',()=>{
+    const svg=normalizeSvgMarkup('<svg width="100" xmlns="http://www.w3.org/2000/svg"><g /></svg>');
+    expect(svg.match(/xmlns=/g)).toHaveLength(1);
+    expect(svg).toContain('role="img"');
   });
 });
