@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/test';
 
+test('property inspector groups settings by workflow',async({page})=>{await page.goto('/');if((page.viewportSize()?.width??1000)<=680)await page.getByRole('button',{name:'样式',exact:true}).click();const panel=page.locator('.property-panel');await expect(panel.getByRole('button',{name:/图表/})).toBeVisible();await expect(panel.getByRole('button',{name:/系列/})).toBeVisible();await expect(panel.getByRole('button',{name:/坐标轴/})).toBeVisible();await expect(panel.getByRole('button',{name:/外观/})).toBeVisible();await panel.getByRole('button',{name:/系列/}).click();await expect(panel.getByText('数据系列',{exact:true})).toBeVisible();await panel.getByRole('button',{name:/坐标轴/}).click();await expect(panel.getByText('轴标题与范围')).toBeVisible();await panel.getByRole('button',{name:/外观/}).click();await expect(panel.getByText('主题与背景')).toBeVisible();});
+
 test('medium tables render every row without accidental virtualization', async ({ page }) => {
   await page.goto('/');
   if ((page.viewportSize()?.width ?? 1000) <= 680) await page.getByRole('button', { name: '数据', exact: true }).click();
