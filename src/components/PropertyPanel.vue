@@ -8,7 +8,7 @@ import AxisStyleEditor from './AxisStyleEditor.vue';
 import ChartStyleEditor from './ChartStyleEditor.vue';
 import ChartBehaviorEditor from './ChartBehaviorEditor.vue';
 import PropertyGroup from './PropertyGroup.vue';
-const props=defineProps<{settings:ChartSettings;numericColumns:number;headers:string[]}>();
+const props=defineProps<{settings:ChartSettings;numericColumns:number;headers:string[];columnIds?:string[]}>();
 const emit=defineEmits<{change:[Partial<ChartSettings>]}>();
 const tab=ref<'chart'|'series'|'axis'|'appearance'>('chart');
 const hasSeriesEditor=computed(()=>['bar','line','area','combo'].includes(props.settings.type));
@@ -45,7 +45,7 @@ function importBrand(){const input=document.createElement('input');input.type='f
       </PropertyGroup>
     </template>    <template v-else-if="tab==='series'">
       <div v-if="!hasSeriesEditor" class="property-empty"><strong>当前图表无需系列设置</strong><span>饼图等图表按数据项配色，请前往“外观”调整主题和品牌色。</span></div>
-      <SeriesEditor v-else :settings="settings" :headers="headers" :combo="settings.type==='combo'" @change="emit('change',$event)"/>
+      <SeriesEditor v-else :settings="settings" :headers="headers" :column-ids="columnIds" :combo="settings.type==='combo'" @change="emit('change',$event)"/>
     </template>
     <template v-else-if="tab==='axis'">
       <PropertyGroup title="轴标题与范围" hint="标题、最小值、最大值和步长" :open="true">

@@ -15,8 +15,8 @@ const chartError=computed(()=>{
   const minimum:{[key:string]:number}={combo:2,scatter:2,bubble:3,heatmap:2},required=minimum[state.settings.type]??1;
   if(state.table.value.headers.length-1<required)return `当前图表至少需要 ${required} 个数值列`;
   if(['pie','doughnut','funnel'].includes(state.settings.type)&&state.table.value.rows.some(row=>(parseNumericValue(row[1]).value??0)<0))return '饼图、环形图和漏斗图不支持负值';
-  const columns=state.table.value.headers.slice(1).map((_,index)=>index+1).filter(column=>!state.settings.hiddenColumns.includes(column)),hasNonPositive=(items:number[])=>state.table.value.rows.some(row=>items.some(column=>{const value=parseNumericValue(row[column]).value;return value!==null&&value<=0;}));
-  if(state.settings.type==='combo'){const right=new Set(state.settings.comboRightAxisColumns??columns.filter(column=>!state.settings.comboBarColumns.includes(column))),left=columns.filter(column=>!right.has(column));if(state.settings.yScaleType==='logarithmic'&&hasNonPositive(left))return '左侧对数轴要求所有数值大于 0';if(state.settings.y2ScaleType==='logarithmic'&&hasNonPositive([...right]))return '右侧对数轴要求所有数值大于 0';}
+  const ids=state.table.value.columnIds??[],resolve=(refs:(number|string)[]|null|undefined)=>(refs??[]).map(ref=>typeof ref==='number'?ref:ids.indexOf(ref)).filter(index=>index>0),hidden=new Set(resolve(state.settings.hiddenColumns)),columns=state.table.value.headers.slice(1).map((_,index)=>index+1).filter(column=>!hidden.has(column)),hasNonPositive=(items:number[])=>state.table.value.rows.some(row=>items.some(column=>{const value=parseNumericValue(row[column]).value;return value!==null&&value<=0;}));
+  if(state.settings.type==='combo'){const bars=new Set(resolve(state.settings.comboBarColumns)),right=new Set(state.settings.comboRightAxisColumns===null?columns.filter(column=>!bars.has(column)):resolve(state.settings.comboRightAxisColumns)),left=columns.filter(column=>!right.has(column));if(state.settings.yScaleType==='logarithmic'&&hasNonPositive(left))return '左侧对数轴要求所有数值大于 0';if(state.settings.y2ScaleType==='logarithmic'&&hasNonPositive([...right]))return '右侧对数轴要求所有数值大于 0';}
   else if(state.settings.yScaleType==='logarithmic'&&hasNonPositive(columns))return '对数轴要求所有数值大于 0';return '';
 });
 const errorCount=computed(()=>state.issues.value.filter(i=>i.level==='error').length);
@@ -31,7 +31,7 @@ async function handleImport(path?:string,encoding='utf-8'){const requestId=++imp
 function cancelImport(){importRequestId++;importing.value=false;showNotice('已取消导入，解析结果不会应用');}
 function saveCurrentTemplate(name:string){userTemplates.value=saveUserTemplate(name,state.table.value,state.settings);showNotice(`模板“${name}”已保存`);}
 function removeTemplate(id:string){userTemplates.value=deleteUserTemplate(id);showNotice('自定义模板已删除');}
-function applyTemplate(template:ProjectTemplate){if(!state.saved.value&&!confirm('应用模板会替换当前数据，是否继续？'))return;state.loadTable(template.data);Object.assign(state.settings,createDefaultChartSettings(),template.chart);projectName.value=template.name;currentPath.value=null;showTemplates.value=false;showNotice(`已应用模板：${template.name}`);}
+function applyTemplate(template:ProjectTemplate){if(!state.saved.value&&!confirm('应用模板会替换当前数据，是否继续？'))return;state.loadTable(template.data);Object.assign(state.settings,createDefaultChartSettings(),template.chart);state.normalizeSeriesBindings();projectName.value=template.name;currentPath.value=null;showTemplates.value=false;showNotice(`已应用模板：${template.name}`);}
 function applySheet(sheet:ImportedSheet){state.loadTable({headers:sheet.headers,rows:sheet.rows});projectName.value=importName.value.replace(/\.[^.]+$/,'')||sheet.name;currentPath.value=null;importSheets.value=[];showNotice(`已导入工作表：${sheet.name}`);}
 async function openRecent(path:string){await handleOpenPath(path);}
 async function handleOpenPath(path:string){try{const {invoke}=await import('@tauri-apps/api/core');const contents=await invoke<string>('read_text_file',{path});const {parseProject}=await import('./platform/native');const document=parseProject(contents);state.loadProject(document.data,document.chart);currentPath.value=path;projectName.value=document.metadata.name;await rememberRecent(path);recentProjects.value=await getRecentProjects();showNotice('最近项目已打开');}catch(error){showNotice(`打开失败：${message(error)}`,true);}}
@@ -109,6 +109,7 @@ onUnmounted(()=>{window.removeEventListener('keydown',keydown);window.removeEven
         :settings="state.settings"
         :numeric-columns="state.table.value.headers.length - 1"
         :headers="state.table.value.headers"
+        :column-ids="state.table.value.columnIds"
         @change="changeSettings"
       />
     </div>
