@@ -50,4 +50,131 @@ onMounted(async()=>{
 });
 onUnmounted(()=>{window.removeEventListener('keydown',keydown);window.removeEventListener('beforeunload',beforeUnload);window.clearTimeout(draftTimer);unlisteners.splice(0).forEach(unlisten=>unlisten());});
 </script>
-<template><div class="app-frame"><AppToolbar :can-undo="Boolean(state.undoStack.value.length)" :can-redo="Boolean(state.redoStack.value.length)" :saved="state.saved.value" :theme="state.appTheme.value" :file-name="fileLabel" @undo="state.undo" @redo="state.redo" @reset="handleReset" @templates="showTemplates=true" @about="showAbout=true" @properties="showProperties=!showProperties" @open="handleOpen" @recent="showRecent=!showRecent" @save="handleSave(false)" @save-as="handleSave(true)" @export="showExport=true" @copy="handleCopy" @theme="applyTheme"/><div class="workspace-grid"><DataPanel :class="{'mobile-hidden':mobileTab!=='data'}" :table="state.table.value" :raw="state.rawInput.value" :issues="state.issues.value" @update:raw="state.rawInput.value=$event" @parse="state.parseRaw" @import="handleImport(undefined,$event)" @cell="state.updateCell" @header="state.renameColumn" @add-row="state.addRow" @delete-rows="state.deleteRows" @add-column="state.addColumn" @delete-column="state.deleteColumn"/><ChartCanvas ref="chart" :class="{'mobile-hidden':mobileTab!=='chart'}" :table="state.table.value" :settings="state.settings" :zoom="state.zoom.value" :error-message="workspaceError"/><PropertyPanel :class="{'mobile-hidden':mobileTab!=='style','drawer-open':showProperties}" :settings="state.settings" :numeric-columns="state.table.value.headers.length-1" @change="changeSettings"/></div><nav class="mobile-tabs" aria-label="移动工作区"><button :class="{active:mobileTab==='data'}" @click="mobileTab='data'">数据</button><button :class="{active:mobileTab==='chart'}" @click="mobileTab='chart'">图表</button><button :class="{active:mobileTab==='style'}" @click="mobileTab='style'">样式</button><button class="share-tab" @click="handleShare">分享</button></nav><StatusBar :rows="state.table.value.rows.length" :cols="state.table.value.headers.length" :errors="errorCount" :saved="state.saved.value" :zoom="state.zoom.value" @zoom="state.zoom.value=$event"/><TemplateDialog v-if="showTemplates" :user-templates="userTemplates" @close="showTemplates=false" @select="applyTemplate" @save="saveCurrentTemplate" @remove="removeTemplate"/><AboutDialog v-if="showAbout" :version="appVersion" @close="showAbout=false"/><ExportDialog v-if="showExport" :project-name="projectName" @close="showExport=false" @export="handleExport"/><div v-if="notice" class="native-notice">{{notice}}</div><div v-if="importing" class="import-progress"><span class="progress-spinner"></span><strong>正在解析文件</strong><button @click="cancelImport">取消</button></div><div v-if="importSheets.length" class="modal-backdrop" @click.self="importSheets=[]"><section class="sheet-dialog"><header><div><span class="eyebrow">WORKBOOK</span><h3>选择工作表</h3></div><button @click="importSheets=[]">×</button></header><p>{{importName}} 包含 {{importSheets.length}} 个工作表</p><button v-for="sheet in importSheets" :key="sheet.name" class="sheet-option" @click="applySheet(sheet)"><strong>{{sheet.name}}</strong><span>{{sheet.rows.length}} 行 × {{sheet.headers.length}} 列</span></button></section></div><aside v-if="showRecent&&recentProjects.length" class="recent-projects"><span>最近项目</span><button v-for="path in recentProjects.slice(0,3)" :key="path" :title="path" @click="openRecent(path)">{{path.split(/[\\/]/).pop()}}</button></aside></div></template>
+<template>
+  <div class="app-frame">
+    <AppToolbar
+      :can-undo="Boolean(state.undoStack.value.length)"
+      :can-redo="Boolean(state.redoStack.value.length)"
+      :saved="state.saved.value"
+      :theme="state.appTheme.value"
+      :file-name="fileLabel"
+      @undo="state.undo"
+      @redo="state.redo"
+      @reset="handleReset"
+      @templates="showTemplates = true"
+      @about="showAbout = true"
+      @properties="showProperties = !showProperties"
+      @open="handleOpen"
+      @recent="showRecent = !showRecent"
+      @save="handleSave(false)"
+      @save-as="handleSave(true)"
+      @export="showExport = true"
+      @copy="handleCopy"
+      @theme="applyTheme"
+    />
+
+    <div class="workspace-grid">
+      <DataPanel
+        :class="{ 'mobile-hidden': mobileTab !== 'data' }"
+        :table="state.table.value"
+        :raw="state.rawInput.value"
+        :issues="state.issues.value"
+        @update:raw="state.rawInput.value = $event"
+        @parse="state.parseRaw"
+        @import="handleImport(undefined, $event)"
+        @cell="state.updateCell"
+        @header="state.renameColumn"
+        @add-row="state.addRow"
+        @delete-rows="state.deleteRows"
+        @add-column="state.addColumn"
+        @delete-column="state.deleteColumn"
+      />
+      <ChartCanvas
+        ref="chart"
+        :class="{ 'mobile-hidden': mobileTab !== 'chart' }"
+        :table="state.table.value"
+        :settings="state.settings"
+        :zoom="state.zoom.value"
+        :error-message="workspaceError"
+      />
+      <PropertyPanel
+        :class="{ 'mobile-hidden': mobileTab !== 'style', 'drawer-open': showProperties }"
+        :settings="state.settings"
+        :numeric-columns="state.table.value.headers.length - 1"
+        @change="changeSettings"
+      />
+    </div>
+
+    <nav class="mobile-tabs" aria-label="移动工作区">
+      <button :class="{ active: mobileTab === 'data' }" @click="mobileTab = 'data'">数据</button>
+      <button :class="{ active: mobileTab === 'chart' }" @click="mobileTab = 'chart'">图表</button>
+      <button :class="{ active: mobileTab === 'style' }" @click="mobileTab = 'style'">样式</button>
+      <button class="share-tab" @click="handleShare">分享</button>
+    </nav>
+
+    <StatusBar
+      :rows="state.table.value.rows.length"
+      :cols="state.table.value.headers.length"
+      :errors="errorCount"
+      :saved="state.saved.value"
+      :zoom="state.zoom.value"
+      @zoom="state.zoom.value = $event"
+    />
+    <TemplateDialog
+      v-if="showTemplates"
+      :user-templates="userTemplates"
+      @close="showTemplates = false"
+      @select="applyTemplate"
+      @save="saveCurrentTemplate"
+      @remove="removeTemplate"
+    />
+    <AboutDialog v-if="showAbout" :version="appVersion" @close="showAbout = false" />
+    <ExportDialog
+      v-if="showExport"
+      :project-name="projectName"
+      @close="showExport = false"
+      @export="handleExport"
+    />
+
+    <div v-if="notice" class="native-notice">{{ notice }}</div>
+    <div v-if="importing" class="import-progress">
+      <span class="progress-spinner"></span>
+      <strong>正在解析文件</strong>
+      <button @click="cancelImport">取消</button>
+    </div>
+
+    <div v-if="importSheets.length" class="modal-backdrop" @click.self="importSheets = []">
+      <section class="sheet-dialog">
+        <header>
+          <div>
+            <span class="eyebrow">WORKBOOK</span>
+            <h3>选择工作表</h3>
+          </div>
+          <button @click="importSheets = []">×</button>
+        </header>
+        <p>{{ importName }} 包含 {{ importSheets.length }} 个工作表</p>
+        <button
+          v-for="sheet in importSheets"
+          :key="sheet.name"
+          class="sheet-option"
+          @click="applySheet(sheet)"
+        >
+          <strong>{{ sheet.name }}</strong>
+          <span>{{ sheet.rows.length }} 行 × {{ sheet.headers.length }} 列</span>
+        </button>
+      </section>
+    </div>
+
+    <aside v-if="showRecent && recentProjects.length" class="recent-projects">
+      <span>最近项目</span>
+      <button
+        v-for="path in recentProjects.slice(0, 3)"
+        :key="path"
+        :title="path"
+        @click="openRecent(path)"
+      >
+        {{ path.split(/[\\/]/).pop() }}
+      </button>
+    </aside>
+  </div>
+</template>
