@@ -57,7 +57,10 @@ export function parseNumericValue(input: unknown): NumericResult {
 export function parseTable(raw: string): DataTable {
   const matrix = parseDelimited(raw);
   if (matrix.length < 2) throw new Error('数据至少需要表头和一行数据');
-  const headers = normalizeHeaders(matrix[0]);
-  const rows = matrix.slice(1).map(row => [...row.slice(0, headers.length), ...Array(Math.max(0, headers.length - row.length)).fill('')]);
+  const width=Math.max(...matrix.map(row=>row.length));
+  if(width<2)throw new Error('数据至少需要一个分类列和一个数值列');
+  const headerRow=[...matrix[0],...Array(Math.max(0,width-matrix[0].length)).fill('')];
+  const headers = normalizeHeaders(headerRow);
+  const rows = matrix.slice(1).map(row => [...row, ...Array(Math.max(0, width - row.length)).fill('')]);
   return { headers, rows };
 }

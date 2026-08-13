@@ -14,6 +14,13 @@ describe('data parser', () => {
   it('normalizes empty and duplicate headers', () => {
     expect(parseTable('项目,,项目\nA,1,2').headers).toEqual(['项目','列2','项目_2']);
   });
+  it('preserves columns that extend beyond the header row', () => {
+    expect(parseTable('项目,数值\nA,1,备注').headers).toEqual(['项目','数值','列3']);
+    expect(parseTable('项目,数值\nA,1,备注').rows[0]).toEqual(['A','1','备注']);
+  });
+  it('rejects single-column input that cannot form a chart', () => {
+    expect(() => parseTable('项目\nA')).toThrow(/分类列和一个数值列/);
+  });
   it('handles currency percentages and invalid values', () => {
     expect(parseNumericValue('￥1,200.50').value).toBe(1200.5);
     expect(parseNumericValue('12.5%').value).toBe(.125);

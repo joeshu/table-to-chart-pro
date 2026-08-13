@@ -12,10 +12,14 @@ const valid = {
 
 describe('project file contract', () => {
   it('loads schema version 1 projects', () => {
-    expect(parseProject(JSON.stringify(valid)).metadata.name).toBe('测试项目');
+    const loaded=parseProject(JSON.stringify(valid));
+    expect(loaded.metadata.name).toBe('测试项目');
+    expect(loaded.chart.pieCutout).toBe(55);
+    expect(loaded.chart.pieCenterText).toBe('');
   });
   it('rejects unsupported or damaged projects', () => {
     expect(() => parseProject('{"schemaVersion":2}')).toThrow(/不受支持|不支持|损坏/);
+    expect(() => parseProject('{"schemaVersion":1,"data":{"headers":[]},"chart":{}}')).toThrow(/损坏/);
   });
   it('migrates legacy projects without a schema version', () => {
     const legacy = { metadata: { name: '旧项目' }, data: valid.data, chart: { ...valid.chart, customColors: undefined } };

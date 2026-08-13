@@ -27,7 +27,7 @@ export const dataLabelPlugin = {
     chart.data.datasets.forEach((dataset: any,index: number)=>{
       const meta=chart.getDatasetMeta(index); if(meta.hidden)return;
       meta.data.forEach((element:any,dataIndex:number)=>{
-        const raw=dataset.data[dataIndex]; const value=typeof raw==='object'?(raw.y??raw.x):raw;
+        const raw=dataset.data[dataIndex]; const value=typeof raw==='object'?(raw.v??raw.y??raw.x):raw;
         if(typeof value!=='number')return; const point=element.tooltipPosition(); ctx.fillText(options.formatter(value),point.x,point.y-5);
       });
     }); ctx.restore();

@@ -1,4 +1,4 @@
-import type { ChartSettings } from '../state/project';
+import { createDefaultChartSettings, type ChartSettings } from '../state/project';
 import type { DataTable } from '../types';
 
 export interface ProjectDocument {
@@ -92,9 +92,9 @@ export async function loadDraft():Promise<ProjectDocument|null>{
 export function migrateProject(value:unknown):ProjectDocument{
   if(!value||typeof value!=='object')throw new Error('项目文件格式不受支持或已损坏');
   const source=value as Record<string,any>;
-  if(source.schemaVersion===1)return {...source,chart:{...source.chart,pieCenterText:source.chart?.pieCenterText??'',pieMergeSmallThreshold:source.chart?.pieMergeSmallThreshold??0}} as ProjectDocument;
+  if(source.schemaVersion===1){if(!source.data||!Array.isArray(source.data.headers)||source.data.headers.length<2||!Array.isArray(source.data.rows)||!source.chart||typeof source.chart!=='object')throw new Error('项目文件格式不受支持或已损坏');return {...source,metadata:{name:String(source.metadata?.name??'未命名项目'),updatedAt:String(source.metadata?.updatedAt??new Date().toISOString())},chart:{...createDefaultChartSettings(),...source.chart,customColors:Array.isArray(source.chart.customColors)?source.chart.customColors:[]}} as ProjectDocument;}
   if(source.schemaVersion===undefined&&source.data?.headers&&source.data?.rows&&source.chart){
-    return {schemaVersion:1,metadata:{name:source.metadata?.name??'迁移项目',updatedAt:source.metadata?.updatedAt??new Date().toISOString()},data:source.data,chart:{...source.chart,customColors:source.chart.customColors??[],pieCenterText:source.chart.pieCenterText??'',pieMergeSmallThreshold:source.chart.pieMergeSmallThreshold??0}} as ProjectDocument;
+    return {schemaVersion:1,metadata:{name:source.metadata?.name??'迁移项目',updatedAt:source.metadata?.updatedAt??new Date().toISOString()},data:source.data,chart:{...createDefaultChartSettings(),...source.chart,customColors:source.chart.customColors??[]}} as ProjectDocument;
   }
   throw new Error(`不支持的项目版本：${String(source.schemaVersion??'未知')}`);
 }

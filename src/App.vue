@@ -3,13 +3,13 @@ import { computed,onMounted,onUnmounted,ref,watchEffect } from 'vue';
 import AppToolbar from './components/AppToolbar.vue';import DataPanel from './components/DataPanel.vue';import ChartCanvas from './components/ChartCanvas.vue';import PropertyPanel from './components/PropertyPanel.vue';import StatusBar from './components/StatusBar.vue';import ExportDialog from './components/ExportDialog.vue';import TemplateDialog from './components/TemplateDialog.vue';import AboutDialog from './components/AboutDialog.vue';
 import { createCsv,createPdf,renderChartImage,type ExportOptions } from './export/exporter';
 import { type ProjectTemplate } from './templates/library';
-import { useProjectState,type AppTheme,type ChartSettings } from './state/project';
+import { createDefaultChartSettings,useProjectState,type AppTheme,type ChartSettings } from './state/project';
 import { copyText,getRecentProjects,importWorkbook,loadDraft,openProject,rememberRecent,saveBatchFiles,saveDraft,saveExportFile,saveProject,shareImage,type ImportedSheet,type ProjectDocument } from './platform/native';
 import {deleteUserTemplate,loadUserTemplates,saveUserTemplate} from './templates/user';
 
 const appVersion=__APP_VERSION__;
 const state=useProjectState(),chart=ref<InstanceType<typeof ChartCanvas>>(),currentPath=ref<string|null>(null),projectName=ref('未命名项目'),notice=ref('');
-const importSheets=ref<ImportedSheet[]>([]),importName=ref(''),importing=ref(false),importCancelled=ref(false),userTemplates=ref(loadUserTemplates()),recentProjects=ref<string[]>([]),showRecent=ref(false),showExport=ref(false),showTemplates=ref(false),showAbout=ref(false),showProperties=ref(false),mobileTab=ref<'data'|'chart'|'style'>('chart');let draftTimer:number|undefined;const unlisteners:(()=>void)[]=[];
+const importSheets=ref<ImportedSheet[]>([]),importName=ref(''),importing=ref(false),userTemplates=ref(loadUserTemplates()),recentProjects=ref<string[]>([]),showRecent=ref(false),showExport=ref(false),showTemplates=ref(false),showAbout=ref(false),showProperties=ref(false),mobileTab=ref<'data'|'chart'|'style'>('chart');let importRequestId=0;let draftTimer:number|undefined;const unlisteners:(()=>void)[]=[];
 const errorCount=computed(()=>state.issues.value.filter(i=>i.level==='error').length);
 const fileLabel=computed(()=>currentPath.value?.split(/[\\/]/).pop()||projectName.value);
 function applyTheme(value:AppTheme){state.setTheme(value);}watchEffect(()=>{document.documentElement.dataset.theme=state.appTheme.value;});
@@ -17,11 +17,11 @@ watchEffect(()=>{JSON.stringify([state.table.value,state.settings]);window.clear
 function changeSettings(value:Partial<ChartSettings>){Object.assign(state.settings,value);state.saved.value=false;}
 function documentValue():ProjectDocument{return{schemaVersion:1,metadata:{name:projectName.value,updatedAt:new Date().toISOString()},data:JSON.parse(JSON.stringify(state.table.value)),chart:JSON.parse(JSON.stringify(state.settings))};}
 function routeOpenedFile(path:string){if(/\.(t2c|json)$/i.test(path))void handleOpenPath(path);else void handleImport(path,'utf-8');}
-async function handleImport(path?:string,encoding='utf-8'){importCancelled.value=false;importing.value=true;try{const workbook=await importWorkbook(path,encoding);if(!workbook||importCancelled.value)return;importName.value=workbook.name;if(workbook.sheets.length===1)applySheet(workbook.sheets[0]);else importSheets.value=workbook.sheets;}catch(error){if(!importCancelled.value)showNotice(`导入失败：${message(error)}`,true);}finally{importing.value=false;}}
-function cancelImport(){importCancelled.value=true;importing.value=false;showNotice('已取消导入，解析结果不会应用');}
+async function handleImport(path?:string,encoding='utf-8'){const requestId=++importRequestId;importing.value=true;try{const workbook=await importWorkbook(path,encoding);if(requestId!==importRequestId||!workbook)return;importName.value=workbook.name;if(workbook.sheets.length===1)applySheet(workbook.sheets[0]);else importSheets.value=workbook.sheets;}catch(error){if(requestId===importRequestId)showNotice(`导入失败：${message(error)}`,true);}finally{if(requestId===importRequestId)importing.value=false;}}
+function cancelImport(){importRequestId++;importing.value=false;showNotice('已取消导入，解析结果不会应用');}
 function saveCurrentTemplate(name:string){userTemplates.value=saveUserTemplate(name,state.table.value,state.settings);showNotice(`模板“${name}”已保存`);}
 function removeTemplate(id:string){userTemplates.value=deleteUserTemplate(id);showNotice('自定义模板已删除');}
-function applyTemplate(template:ProjectTemplate){if(!state.saved.value&&!confirm('应用模板会替换当前数据，是否继续？'))return;state.loadTable(template.data);Object.assign(state.settings,template.chart);projectName.value=template.name;currentPath.value=null;showTemplates.value=false;showNotice(`已应用模板：${template.name}`);}
+function applyTemplate(template:ProjectTemplate){if(!state.saved.value&&!confirm('应用模板会替换当前数据，是否继续？'))return;state.loadTable(template.data);Object.assign(state.settings,createDefaultChartSettings(),template.chart);projectName.value=template.name;currentPath.value=null;showTemplates.value=false;showNotice(`已应用模板：${template.name}`);}
 function applySheet(sheet:ImportedSheet){state.loadTable({headers:sheet.headers,rows:sheet.rows});projectName.value=importName.value.replace(/\.[^.]+$/,'')||sheet.name;importSheets.value=[];showNotice(`已导入工作表：${sheet.name}`);}
 async function openRecent(path:string){currentPath.value=path;await handleOpenPath(path);}
 async function handleOpenPath(path:string){try{const {invoke}=await import('@tauri-apps/api/core');const contents=await invoke<string>('read_text_file',{path});const {parseProject}=await import('./platform/native');const document=parseProject(contents);state.loadProject(document.data,document.chart);currentPath.value=path;projectName.value=document.metadata.name;await rememberRecent(path);recentProjects.value=await getRecentProjects();showNotice('最近项目已打开');}catch(error){showNotice(`打开失败：${message(error)}`,true);}}

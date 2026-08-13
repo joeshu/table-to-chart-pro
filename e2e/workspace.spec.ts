@@ -1,5 +1,16 @@
 import { expect, test } from '@playwright/test';
 
+test('medium tables render every row without accidental virtualization', async ({ page }) => {
+  await page.goto('/');
+  if ((page.viewportSize()?.width ?? 1000) <= 680) await page.getByRole('button', { name: '数据', exact: true }).click();
+  await page.getByRole('button', { name: '粘贴' }).click();
+  const rows=Array.from({length:50},(_,index)=>`项目 ${index+1}\t${index+1}`);
+  await page.getByPlaceholder('从 Excel、WPS 或 Numbers 粘贴数据').fill(['项目\t数值',...rows].join('\n'));
+  await page.getByRole('button', { name: '识别并更新' }).click();
+  await expect(page.locator('.workspace-table tbody tr:not(.virtual-spacer)')).toHaveCount(50);
+  await expect(page.getByText(/已启用虚拟渲染/)).toHaveCount(0);
+});
+
 test('paste data, render chart and open export dialog', async ({ page }) => {
   await page.goto('/');
   if ((page.viewportSize()?.width ?? 1000) <= 680) {
